@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+transformers
+torch
+easyocr
+langchain
+langchain-community
+sentence-transformers
+chromadb

@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # FastAPI AI Models Backend
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kfintech_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - HOST=0.0.0.0
+    volumes:
+      - ./backend:/app
+    networks:
+      - kfintech-network
+
+  # Placeholder for Node.js (e.g. Express/NestJS)
+  # node_service:
+  #   build:
+  #     context: ../node_service_path
+  #   ports:
+  #     - "3000:3000"
+  #   networks:
+  #     - kfintech-network
+
+  # Placeholder for React Frontend
+  # frontend:
+  #   build:
+  #     context: ../frontend_path
+  #   ports:
+  #     - "3001:3001"
+  #   networks:
+  #     - kfintech-network
+
+networks:
+  kfintech-network:
+    driver: bridge
