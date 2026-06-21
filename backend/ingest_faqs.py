@@ -1,7 +1,11 @@
 import os
+# pyrefly: ignore [missing-import]
 from langchain_community.document_loaders import TextLoader
+# pyrefly: ignore [missing-import]
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+# pyrefly: ignore [missing-import]
 from langchain_community.embeddings import HuggingFaceEmbeddings
+# pyrefly: ignore [missing-import]
 from langchain_community.vectorstores import Chroma
 
 # Sample text data (Complex KFintech SLA policies and mutual fund rules)

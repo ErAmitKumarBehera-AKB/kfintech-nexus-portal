@@ -1,7 +1,23 @@
+import os
+import platform
+import ctypes
+from importlib.util import find_spec
+
+# Fix PyTorch DLL loading issue on Windows
+if platform.system() == "Windows":
+    try:
+        if (spec := find_spec("torch")) and spec.origin and os.path.exists(
+            dll_path := os.path.join(os.path.dirname(spec.origin), "lib", "c10.dll")
+        ):
+            ctypes.CDLL(os.path.normpath(dll_path))
+    except Exception:
+        pass
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI
-from app.api import sentiment
-from app.api import ocr
-from app.api import chatbot
+# pyrefly: ignore [missing-import]
+from .api import sentiment
+from .api import ocr
+from .api import chatbot
 
 app = FastAPI(title="KFintech Nexus Portal AI Models API")
 

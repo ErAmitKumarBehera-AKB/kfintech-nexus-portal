@@ -17,6 +17,16 @@ services:
     networks:
       - kfintech-network
 
+  # Local MongoDB Replica Set for strict transactions
+  mongodb:
+    image: mongo:latest
+    container_name: kfintech_mongo
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - "27018:27017"
+    networks:
+      - kfintech-network
+
   # Placeholder for Node.js (e.g. Express/NestJS)
   # node_service:
   #   build:
