@@ -74,7 +74,18 @@ const L2CheckerDesk = () => {
         const fetchL2Queue = async () => {
             try {
                 const response = await apiClient.get('/dashboard/l2-queue');
-                setTickets(response.data.data || []);
+                let fetchedTickets = response.data.data || [];
+                
+                // Sort by Priority (CRITICAL > HIGH > NORMAL) and then by Oldest First
+                const priorityWeight = { 'CRITICAL': 3, 'HIGH': 2, 'NORMAL': 1 };
+                fetchedTickets.sort((a, b) => {
+                    const weightA = priorityWeight[a.assignedPriority || 'NORMAL'] || 1;
+                    const weightB = priorityWeight[b.assignedPriority || 'NORMAL'] || 1;
+                    if (weightA !== weightB) return weightB - weightA;
+                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                });
+                
+                setTickets(fetchedTickets);
                 setError(null);
             } catch (err) {
                 console.error("Error fetching L2 queue:", err);

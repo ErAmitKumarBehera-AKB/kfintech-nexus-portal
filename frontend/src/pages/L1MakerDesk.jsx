@@ -24,7 +24,18 @@ const L1MakerDesk = () => {
         const fetchQueue = async () => {
             try {
                 const response = await apiClient.get('/dashboard/l1-queue');
-                setQueue(response.data.data || []);
+                let fetchedTickets = response.data.data || [];
+                
+                // Sort by Priority (CRITICAL > HIGH > NORMAL) and then by Oldest First (closest to SLA breach)
+                const priorityWeight = { 'CRITICAL': 3, 'HIGH': 2, 'NORMAL': 1 };
+                fetchedTickets.sort((a, b) => {
+                    const weightA = priorityWeight[a.assignedPriority || 'NORMAL'] || 1;
+                    const weightB = priorityWeight[b.assignedPriority || 'NORMAL'] || 1;
+                    if (weightA !== weightB) return weightB - weightA; // Higher weight first
+                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); // Oldest first
+                });
+                
+                setQueue(fetchedTickets);
             } catch (error) {
                 console.error("Queue Fetch Error:", error);
             } finally {
