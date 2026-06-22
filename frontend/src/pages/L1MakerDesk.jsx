@@ -34,11 +34,30 @@ const L1MakerDesk = () => {
         fetchQueue();
     }, []);
 
-    const timeElapsed = (dateString) => {
-        if (!dateString) return 'Just now';
-        const mins = Math.floor((new Date() - new Date(dateString)) / 60000);
-        if (mins < 60) return `${mins}m ago`;
-        return `${Math.floor(mins / 60)}h ago`;
+    const calculateSLA = (dateString, priority) => {
+        if (!dateString) return <span className="text-gray-400">N/A</span>;
+        
+        let slaHours = 24;
+        if (priority === 'CRITICAL') slaHours = 2;
+        else if (priority === 'HIGH') slaHours = 4;
+        
+        const createdTime = new Date(dateString).getTime();
+        const deadline = createdTime + (slaHours * 60 * 60 * 1000);
+        const now = new Date().getTime();
+        const diffMs = deadline - now;
+        
+        if (diffMs <= 0) {
+            return <span className="text-red-500 font-black animate-pulse">SLA BREACHED</span>;
+        }
+        
+        const diffMins = Math.floor(diffMs / 60000);
+        if (diffMins < 60) {
+            return <span className={diffMins < 15 ? "text-orange-400 font-bold" : "text-emerald-400"}>{diffMins}m remaining</span>;
+        }
+        
+        const hours = Math.floor(diffMins / 60);
+        const mins = diffMins % 60;
+        return <span className="text-emerald-400">{hours}h {mins}m remaining</span>;
     };
 
     const handleRunOCR = () => {
@@ -147,7 +166,7 @@ const L1MakerDesk = () => {
                                         <span className="uppercase text-kfintech-accent tracking-wider">{ticket.status}</span>
                                         <span className="flex items-center gap-1 bg-kfintech-bg px-2 py-1 rounded">
                                             <Clock className="w-3 h-3" />
-                                            {timeElapsed(ticket.createdAt)}
+                                            {calculateSLA(ticket.createdAt, ticket.assignedPriority)}
                                         </span>
                                     </div>
                                 </motion.div>

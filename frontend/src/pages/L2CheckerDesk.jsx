@@ -38,6 +38,33 @@ const SentimentBar = ({ score }) => {
     );
 };
 
+const calculateSLA = (dateString, priority) => {
+    if (!dateString) return <span className="text-gray-400">N/A</span>;
+    
+    let slaHours = 24;
+    if (priority === 'CRITICAL') slaHours = 2;
+    else if (priority === 'HIGH') slaHours = 4;
+    
+    const createdTime = new Date(dateString).getTime();
+    const deadline = createdTime + (slaHours * 60 * 60 * 1000);
+    const now = new Date().getTime();
+    const diffMs = deadline - now;
+    
+    if (diffMs <= 0) {
+        return <span className="text-red-500 font-black animate-pulse">SLA BREACHED</span>;
+    }
+    
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 60) {
+        return <span className={diffMins < 15 ? "text-orange-400 font-bold bg-orange-400/10 px-2 py-0.5 rounded border border-orange-400/30" : "text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/30"}>{diffMins}m remaining</span>;
+    }
+    
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    return <span className="text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/30">{hours}h {mins}m remaining</span>;
+};
+
+
 const L2CheckerDesk = () => {
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -135,7 +162,12 @@ const L2CheckerDesk = () => {
                                         <span className="text-xs text-gray-500 font-bold uppercase tracking-widest">Ticket Reference</span>
                                         <div className="font-mono text-sm text-gray-300 font-semibold mt-1">#{ticket._id}</div>
                                     </div>
-                                    <Badge priority={ticket.assignedPriority} />
+                                    <div className="flex flex-col items-end gap-2">
+                                        <Badge priority={ticket.assignedPriority} />
+                                        <div className="text-xs font-mono font-bold tracking-tight">
+                                            SLA: {calculateSLA(ticket.createdAt, ticket.assignedPriority)}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="p-6 flex-grow">
