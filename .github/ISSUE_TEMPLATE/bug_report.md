@@ -1,32 +1,32 @@
 ---
 name: Bug report
-about: Create a report to help us improve KFintech Nexus
+about: Report a system anomaly impacting Nexus workflows or AI accuracy.
 title: '[BUG] '
 labels: 'bug, needs triage'
 assignees: ''
 ---
 
-## Describe the bug
-A clear and concise description of what the bug is.
+## 🐛 Defect Description
+A clear and concise description of the defect, emphasizing its impact on the **business process** (e.g., "OCR fails on high-noise scans, leading to manual review bottlenecks").
 
-## To Reproduce
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+## 🔄 Reproduction Steps
+1. Navigate to '...'
+2. Trigger action '....'
+3. Observe anomaly: '....'
 
-## Expected behavior
-A clear and concise description of what you expected to happen.
+## 🎯 Expected Business Outcome
+What should the system have done? (e.g., "The system should flag the document as invalid and hold the ticket in L1 rather than failing silently.")
 
-## Screenshots
-If applicable, add screenshots to help explain your problem.
+## 📊 Impact & Severity
+- [ ] Critical (Halts Maker/Checker Workflow or Data Corruption)
+- [ ] High (AI Model inaccuracy > 10%)
+- [ ] Medium (UI/UX defect, workarounds exist)
+- [ ] Low (Cosmetic)
 
-## Environment:
+## 📸 Evidence (Logs / Screenshots)
+Add any relevant Docker logs (`docker logs kfintech_backend`), LocalStack traces, or UI screenshots.
+
+## 🖥️ Environment Profile:
  - OS: [e.g. Windows, macOS, Linux]
- - Browser [e.g. chrome, safari]
- - Docker Compose Mode: [e.g. GPU, CPU]
+ - GPU Mode active? [Yes/No]
  - LocalStack Version: [e.g. 2.3.2]
-
-## Additional context
-Add any other context about the problem here.

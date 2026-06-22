@@ -1,19 +1,24 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
+about: Propose a high-impact feature to scale or optimize the Nexus Portal.
 title: '[FEATURE] '
 labels: 'enhancement'
 assignees: ''
 ---
 
-## Is your feature request related to a problem? Please describe.
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+## 🚀 Business Problem
+Describe the operational bottleneck or market opportunity this feature addresses. (e.g., "Agents currently spend time manually verifying email domains; automating this would reduce TAT by 5%.")
 
-## Describe the solution you'd like
-A clear and concise description of what you want to happen. Consider the impact on the existing L1/L2 workflows or AI Pipelines.
+## 💡 Proposed Solution
+A clear description of the solution. Detail how this integrates with our existing **AI Pipelines** (FinBERT/Ollama) or **Compliance Workflows** (L1/L2 Maker-Checker).
 
-## Describe alternatives you've considered
-A clear and concise description of any alternative solutions or features you've considered.
+## 📈 Projected Business Impact
+- **Time/Cost Savings:** (e.g., "Will save ~2 minutes per ticket")
+- **Compliance:** (e.g., "Improves audit trail granularity")
+- **AI Accuracy:** (e.g., "Enhances OCR confidence scoring")
 
-## Additional context
-Add any other context or mockups about the feature request here.
+## 🔄 Alternatives Considered
+What other approaches were evaluated, and why is this proposal superior?
+
+## 📎 Architecture / Mockups
+Add any system design diagrams, prompt-engineering examples, or UI mockups.

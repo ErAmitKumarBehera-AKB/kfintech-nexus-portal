@@ -1,22 +1,35 @@
 # Contributing to KFintech Nexus Portal
 
-First off, thank you for considering contributing to the KFintech Nexus Portal! It's people like you that make this application robust and scalable.
+Welcome! Thank you for your interest in contributing to the **KFintech Nexus Portal**, an AI-driven, enterprise-grade grievance management system. We are actively expanding this project for our upcoming hackathon presentation and value high-impact contributions that drive **business efficiency, AI accuracy, and system scalability.**
 
-## Development Workflow
+## 🎯 Our Hackathon Vision
+Our goal is to demonstrate how unstructured, complex investor grievances can be fully automated using LLMs (Llama 3 via Ollama), NLP (FinBERT), and Computer Vision (EasyOCR). Contributions should align with these core objectives:
+1. **Minimizing Human Touch-Points:** Automating triage, sentiment scoring, and summarization.
+2. **Zero-Trust Compliance:** Strict Maker-Checker (L1/L2) workflows and immutable audit logs.
+3. **Enterprise Scalability:** Ensuring the Dockerized microservices can scale effectively in a production environment.
 
-1. **Fork** the repository and clone it locally.
-2. **Branch** off of `main` for your feature or bug fix: `git checkout -b feature/my-awesome-feature`.
-3. **Run Locally** using Docker Compose:
+## 🛠️ Development Workflow
+
+1. **Fork & Clone:** Fork the repository to your own GitHub account and clone it locally.
+2. **Branch Naming Strategy:** 
+   - Feature: `feat/ai-model-upgrade`
+   - Bugfix: `fix/ocr-accuracy`
+   - Performance: `perf/mongodb-indexing`
+3. **Run Locally via Docker:**
+   We strictly use Docker Compose to ensure environmental parity.
    ```bash
+   # GPU Accelerated Mode (Preferred)
+   docker-compose up --build -d
+   
+   # CPU Fallback Mode
    docker-compose -f docker-compose.cpu.yml up --build -d
    ```
-4. **Commit** your changes with clear, descriptive commit messages.
-5. **Push** your branch to your fork.
-6. **Open a Pull Request** against our `main` branch.
+4. **Commit:** Write clear, concise commit messages detailing *why* the change was made and its *business impact*.
+5. **Open a Pull Request:** Ensure your PR template is fully filled out, explicitly stating the metrics improved (e.g., "Reduced LLM inference time by 20%").
 
-## Code Style & Standards
-- We use **ESLint** and **Prettier** for the React and Node.js codebases.
-- Python code should adhere to **PEP 8** standards.
-- Ensure all automated AWS interactions continue to mock correctly against **LocalStack**. Please *never* commit real AWS credentials.
+## 📏 Code Quality & Standards
+- **AI Microservice (Python):** Must adhere to **PEP 8**. Ensure GPU memory management is optimized.
+- **Orchestrator & Frontend (JS/React):** Use **ESLint** and **Prettier**. Maintain the Glassmorphic UI aesthetic.
+- **Security:** **NEVER** commit real AWS credentials. The system relies entirely on **LocalStack** for secure, localized S3/SES/SNS simulation.
 
-Thank you!
+Your contributions help us build the future of automated, intelligent financial operations!
