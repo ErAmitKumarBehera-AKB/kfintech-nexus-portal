@@ -32,16 +32,27 @@ def analyze_complaint(request: ComplaintRequest):
         # FinBERT Returns [{'label': 'positive'/'negative'/'neutral', 'score': 0.99}]
         result = sentiment_analyzer(text)[0]
         label = result['label'].upper()
+        confidence = result['score']
         
-        # Map FinBERT's neutral/positive to normal, and negative to critical
-        sentiment = label
-        score = round(result['score'], 4)
+        # Calculate Frustration Index
+        if label == "NEGATIVE":
+            score = confidence
+            sentiment = "NEGATIVE"
+        elif label == "POSITIVE":
+            score = 1.0 - confidence
+            sentiment = "POSITIVE"
+        else:
+            # NEUTRAL
+            score = 0.5
+            sentiment = "NEUTRAL"
+            
+        score = round(score, 4)
     else:
         # Fallback if model fails to load
         sentiment = "NEGATIVE" if "angry" in text.lower() or "terrible" in text.lower() else "POSITIVE"
-        score = 0.50
+        score = 0.9 if sentiment == "NEGATIVE" else 0.1
         
-    priority = "CRITICAL" if sentiment == "NEGATIVE" else "NORMAL"
+    priority = "CRITICAL" if score > 0.75 else "NORMAL"
     
     return ComplaintResponse(
         sentiment=sentiment,

@@ -73,7 +73,7 @@ docker-compose -f docker-compose.cpu.yml up --build
 
 ## 🛡️ Stability & Compatibility Notes
 - **Robust Architecture:** Docker environments are strictly pinned (`transformers==4.38.2`, `numpy<2.0.0`) preventing native binary clashes with `torch==2.2.0`, ensuring flawless execution across any judge's machine.
-- **Llama 3 Chatbot:** The chatbot relies on a local [Ollama](https://ollama.com/) instance due to its 5GB size. If Ollama is offline, the core OCR and FinBERT workflow engines will still function perfectly with 100% reliability.
+- **Embedded Llama 3 Engine:** The Generative AI Chatbot and Summary Engine relies on Llama 3.2:1b. We have completely **Dockerized the Ollama engine**, meaning teammates and judges NO LONGER need to install Ollama locally! The entire AI engine spins up autonomously via the Docker Compose cluster and gracefully scales across CPU and GPU configurations.
 
 <div align="center">
   <p><i>Built with ❤️ for the Hackathon</i></p>

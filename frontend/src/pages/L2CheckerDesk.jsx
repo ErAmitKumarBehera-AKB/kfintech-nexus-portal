@@ -155,7 +155,7 @@ const L2CheckerDesk = () => {
                                         </div>
                                         
                                         <ul className="space-y-3 mb-6">
-                                            {ticket.aiSummary ? (
+                                            {ticket.aiSummary && ticket.aiSummary.length > 0 ? (
                                                 ticket.aiSummary.map((point, idx) => (
                                                     <li key={idx} className="flex gap-3 text-sm text-gray-300 font-medium">
                                                         <span className="text-kfintech-primary font-bold mt-0.5">•</span>
@@ -163,20 +163,9 @@ const L2CheckerDesk = () => {
                                                     </li>
                                                 ))
                                             ) : (
-                                                <>
-                                                    <li className="flex gap-3 text-sm text-gray-300 font-medium">
-                                                        <span className="text-kfintech-primary font-bold mt-0.5">•</span>
-                                                        <span className="leading-snug">Detected potential SLA violation regarding mutual fund transfer timing.</span>
-                                                    </li>
-                                                    <li className="flex gap-3 text-sm text-gray-300 font-medium">
-                                                        <span className="text-kfintech-primary font-bold mt-0.5">•</span>
-                                                        <span className="leading-snug">Customer sentiment analysis flags high risk of platform churn.</span>
-                                                    </li>
-                                                    <li className="flex gap-3 text-sm text-gray-300 font-medium">
-                                                        <span className="text-kfintech-primary font-bold mt-0.5">•</span>
-                                                        <span className="leading-snug">OCR Zero-Touch automatically pre-verified attached documents successfully.</span>
-                                                    </li>
-                                                </>
+                                                <li className="flex gap-3 text-sm text-gray-300 font-medium text-center italic w-full opacity-50">
+                                                    No AI Summary generated.
+                                                </li>
                                             )}
                                         </ul>
                                         

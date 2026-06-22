@@ -10,6 +10,18 @@ const TicketSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    investorName: {
+        type: String,
+        default: 'Unknown Investor'
+    },
+    accountNumber: {
+        type: String,
+        default: 'Not Provided'
+    },
+    documentName: {
+        type: String,
+        default: null
+    },
     aiSentimentScore: {
         type: Number,
         default: 0
@@ -18,6 +30,18 @@ const TicketSchema = new mongoose.Schema({
         type: String,
         enum: ['NORMAL', 'CRITICAL'],
         default: 'NORMAL'
+    },
+    aiSummary: {
+        type: [String],
+        default: []
+    },
+    ocrExtractedText: {
+        type: String,
+        default: null
+    },
+    ocrMatchVerified: {
+        type: Boolean,
+        default: false
     },
     status: {
         type: String,

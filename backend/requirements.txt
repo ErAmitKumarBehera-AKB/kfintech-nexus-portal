@@ -5,11 +5,5 @@ python-multipart
 transformers==4.38.2
 
 easyocr
-langchain
-langchain-community
-sentence-transformers
-chromadb
 requests
-pandas
-scikit-learn
 numpy<2.0.0

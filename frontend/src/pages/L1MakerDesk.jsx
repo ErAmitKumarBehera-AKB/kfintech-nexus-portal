@@ -177,6 +177,18 @@ const L1MakerDesk = () => {
                                         ID: {selectedTicket._id}
                                     </span>
                                 </div>
+                                
+                                <div className="mb-6 grid grid-cols-2 gap-4">
+                                    <div className="bg-kfintech-bg/50 p-4 rounded-xl border border-kfintech-border shadow-inner">
+                                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Investor Name</h4>
+                                        <p className="text-white font-medium">{selectedTicket.investorName || 'Unknown Investor'}</p>
+                                    </div>
+                                    <div className="bg-kfintech-bg/50 p-4 rounded-xl border border-kfintech-border shadow-inner">
+                                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Account Number</h4>
+                                        <p className="text-white font-mono">{selectedTicket.accountNumber || 'Not Provided'}</p>
+                                    </div>
+                                </div>
+
                                 <div>
                                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                                         <FileText className="w-4 h-4" /> Investor Complaint String
@@ -199,8 +211,8 @@ const L1MakerDesk = () => {
                                         </div>
                                         <div className="text-center relative z-10 group-hover:scale-105 transition-transform">
                                             <FileText className="w-16 h-16 text-gray-500 mx-auto mb-3" />
-                                            <p className="text-sm font-bold text-blue-300">investor_statement_q3.pdf</p>
-                                            <p className="text-xs text-gray-500 mt-1">2.4 MB • AES-256 Encrypted</p>
+                                            <p className="text-sm font-bold text-blue-300">{selectedTicket.documentName || "No document attached"}</p>
+                                            <p className="text-xs text-gray-500 mt-1">{selectedTicket.documentName ? "AES-256 Encrypted" : "OCR disabled"}</p>
                                         </div>
                                     </div>
 
@@ -216,7 +228,16 @@ const L1MakerDesk = () => {
                                             <motion.button 
                                                 whileHover={{ scale: 1.02 }}
                                                 whileTap={{ scale: 0.98 }}
-                                                onClick={handleRunOCR}
+                                                onClick={() => {
+                                                    setIsOcrRunning(true);
+                                                    setTimeout(() => {
+                                                        setIsOcrRunning(false);
+                                                        setOcrResult({
+                                                            matched: selectedTicket.ocrMatchVerified || false,
+                                                            extracted: selectedTicket.ocrExtractedText || "No document attached or OCR processing failed."
+                                                        });
+                                                    }, 800);
+                                                }}
                                                 disabled={isOcrRunning}
                                                 className={`w-full py-4 rounded-xl text-sm font-bold uppercase tracking-wider text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
                                                     isOcrRunning ? 'bg-kfintech-border cursor-wait text-gray-400' : 'bg-kfintech-primary hover:bg-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.6)]'
@@ -232,12 +253,12 @@ const L1MakerDesk = () => {
                                                     <motion.div 
                                                         initial={{ opacity: 0, y: 10 }}
                                                         animate={{ opacity: 1, y: 0 }}
-                                                        className="mt-6 bg-kfintech-accent/10 p-5 rounded-xl border border-kfintech-accent/30 shadow-inner"
+                                                        className={`mt-6 p-5 rounded-xl border shadow-inner ${ocrResult.matched ? 'bg-kfintech-accent/10 border-kfintech-accent/30' : 'bg-red-500/10 border-red-500/30'}`}
                                                     >
-                                                        <div className="flex items-center gap-2 text-emerald-400 font-bold mb-3 text-sm uppercase tracking-wider">
-                                                            <CheckCircle2 className="w-5 h-5" /> Match Verified
+                                                        <div className={`flex items-center gap-2 font-bold mb-3 text-sm uppercase tracking-wider ${ocrResult.matched ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                            {ocrResult.matched ? <><CheckCircle2 className="w-5 h-5" /> CRM Match Verified</> : <><ShieldAlert className="w-5 h-5" /> Verification Failed</>}
                                                         </div>
-                                                        <pre className="text-xs bg-kfintech-bg/80 p-3 rounded-lg text-gray-300 font-mono border border-kfintech-border shadow-inner leading-relaxed">
+                                                        <pre className="text-xs bg-kfintech-bg/80 p-3 rounded-lg text-gray-300 font-mono border border-kfintech-border shadow-inner leading-relaxed whitespace-pre-wrap">
                                                             {ocrResult.extracted}
                                                         </pre>
                                                     </motion.div>

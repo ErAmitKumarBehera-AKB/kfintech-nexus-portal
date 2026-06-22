@@ -54,7 +54,7 @@ exports.getL2Queue = async (req, res) => {
         // Fetch tickets in L2_APPROVAL status for the Checker desk
         // Specifically including aiSentimentScore and assignedPriority for UI highlighting
         const tickets = await Ticket.find({ status: 'L2_APPROVAL' })
-            .select('investorId complaintText aiSentimentScore assignedPriority status createdAt updatedAt')
+            .select('investorId investorName accountNumber documentName complaintText aiSentimentScore assignedPriority aiSummary ocrExtractedText ocrMatchVerified status createdAt updatedAt')
             .sort({ createdAt: 1 })
             .lean();
             

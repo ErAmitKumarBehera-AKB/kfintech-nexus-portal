@@ -46,6 +46,9 @@ services:
       - PORT=5000
       - MONGODB_URI=mongodb://mongodb:27017/kfintech_nexus?directConnection=true
       - ML_SERVICE_URL=http://backend:8000
+    volumes:
+      - ./node_service:/app
+      - /app/node_modules
     depends_on:
       - mongodb
       - backend
@@ -60,11 +63,38 @@ services:
     container_name: kfintech_frontend
     ports:
       - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - node_service
     networks:
       - kfintech-network
 
+  # Local Llama 3 AI Engine
+  ollama:
+    image: ollama/ollama:latest
+    container_name: kfintech_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 10 && ollama pull llama3.2:1b && wait"]
+    networks:
+      - kfintech-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
 networks:
   kfintech-network:
     driver: bridge
+
+volumes:
+  ollama_data:
+
+

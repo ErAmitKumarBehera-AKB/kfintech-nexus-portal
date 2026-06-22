@@ -1,13 +1,25 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import apiClient from '../api/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UploadCloud, CheckCircle2, AlertCircle, Send, FileText } from 'lucide-react';
 
 const InvestorDashboard = () => {
-    const [formData, setFormData] = useState({ title: '', category: 'Mutual Funds', description: '' });
+    const [formData, setFormData] = useState({ title: '', category: 'Mutual Funds', description: '', investorName: 'Amit', accountNumber: '9876543210' });
     const [file, setFile] = useState(null);
     const [status, setStatus] = useState({ type: '', message: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        // Pre-load the demo document so the user doesn't have to manually upload it
+        fetch('/demo_statement.png')
+            .then(res => res.blob())
+            .then(blob => {
+                const demoFile = new File([blob], 'demo_statement.png', { type: 'image/png' });
+                setFile(demoFile);
+            })
+            .catch(err => console.error('Failed to load demo document:', err));
+    }, []);
+
     const fileInputRef = useRef(null);
 
     const handleChange = (e) => {
@@ -38,6 +50,8 @@ const InvestorDashboard = () => {
             
             const payload = new FormData();
             payload.append('complaintText', complaintText);
+            payload.append('investorName', formData.investorName);
+            payload.append('accountNumber', formData.accountNumber);
             if (file) {
                 payload.append('file', file);
             }
@@ -53,7 +67,7 @@ const InvestorDashboard = () => {
                 message: 'Ticket successfully transmitted. It has been queued for immediate L1 Maker review.' 
             });
             
-            setFormData({ title: '', category: 'Mutual Funds', description: '' });
+            setFormData({ title: '', category: 'Mutual Funds', description: '', investorName: formData.investorName, accountNumber: formData.accountNumber });
             setFile(null);
         } catch (error) {
             console.error("Submission Error:", error);
@@ -109,6 +123,34 @@ const InvestorDashboard = () => {
                 )}
                 
                 <div className="p-8 space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <label className="block text-xs font-extrabold text-kfintech-primary mb-2 uppercase tracking-widest">Investor Name</label>
+                            <select 
+                                name="investorName"
+                                value={formData.investorName}
+                                onChange={handleChange}
+                                className="w-full bg-kfintech-bg border border-kfintech-border rounded-xl p-4 text-white focus:ring-2 focus:ring-kfintech-primary/50 focus:border-kfintech-primary outline-none transition-all shadow-inner cursor-pointer appearance-none"
+                            >
+                                <option value="Amit">Amit (Perfect OCR Match)</option>
+                                <option value="John Doe">John Doe (Failure Test)</option>
+                                <option value="Jane Smith">Jane Smith (Failure Test)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-extrabold text-kfintech-primary mb-2 uppercase tracking-widest">Account Number</label>
+                            <select 
+                                name="accountNumber"
+                                value={formData.accountNumber}
+                                onChange={handleChange}
+                                className="w-full bg-kfintech-bg border border-kfintech-border rounded-xl p-4 text-white focus:ring-2 focus:ring-kfintech-primary/50 focus:border-kfintech-primary outline-none transition-all shadow-inner cursor-pointer appearance-none"
+                            >
+                                <option value="9876543210">9876543210 (Perfect OCR Match)</option>
+                                <option value="1111111111">1111111111 (Failure Test)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
                             <label className="block text-xs font-extrabold text-kfintech-primary mb-2 uppercase tracking-widest">Ticket Title</label>

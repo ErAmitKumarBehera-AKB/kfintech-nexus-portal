@@ -16,10 +16,10 @@ class ChatResponse(BaseModel):
 
 @router.post("/ask", response_model=ChatResponse)
 def ask_chatbot(request: ChatRequest):
-    # Connect to the Local Ollama instance running on the host machine
-    url = "http://host.docker.internal:11434/api/generate"
+    # Connect to the Local Ollama instance running in the Docker network
+    url = "http://ollama:11434/api/generate"
     payload = {
-        "model": "llama3:8b",
+        "model": "llama3.2:1b",
         "prompt": f"You are a helpful KFintech compliance assistant. Answer the following user query briefly: {request.question}",
         "stream": False
     }
@@ -31,10 +31,9 @@ def ask_chatbot(request: ChatRequest):
         llm_response = data.get("response", "No response generated.")
     except Exception as e:
         llm_response = (
-            "NOTICE: The Ollama Llama 3 model is not running or could not be found on the host machine. "
-            "Because of the absence of the Ollama model, this specific chatbot task cannot be completed. "
-            "However, please rest assured that all other AI features (OCR Document Verification and Sentiment Analysis) "
-            "are fully functional and accurate!"
+            "NOTICE: The AI Insights Engine is currently initializing its language models or is temporarily unavailable. "
+            "Because of this, the detailed summary cannot be completed at this exact moment. "
+            "However, OCR Document Verification and Sentiment Analysis are fully functional."
         )
 
     return ChatResponse(
