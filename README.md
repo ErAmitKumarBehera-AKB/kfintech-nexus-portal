@@ -24,7 +24,7 @@ The **KFintech Nexus Portal** is a multi-tier, AI-native compliance engine. It a
 ### 🌟 Unmatched Business Value
 - **⚡ 80% Reduction in Triage Time:** Instantaneous Zero-Touch OCR and NLP processing.
 - **🎯 87.5% Routing Accuracy:** Powered by `FinBERT`, an LLM specifically tuned for Wall-Street financial markets.
-- **⏱️ Dynamic SLA Tracking System:** Live UI countdowns strictly enforce 2-Hour SLAs for CRITICAL tickets and 24-Hour SLAs for NORMAL operations.
+- **⏱️ Dynamic SLA Tracking & Auto-Escalation:** Live UI countdowns strictly enforce 2-Hour SLAs for CRITICAL tickets. Breached tickets instantly flash red and are permanently locked to the #1 queue position until resolved.
 - **📉 Churn Prevention:** Automatically flags high-frustration investors for immediate retention action via our AI Frustration Index.
 - **🔒 Enterprise Security:** Secure document inspector keeps confidential PDFs and investor statements encrypted.
 
