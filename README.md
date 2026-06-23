@@ -81,12 +81,6 @@ If you do not have a dedicated NVIDIA GPU, use our lightweight CPU manifest whic
 docker-compose -f docker-compose.cpu.yml up --build -d
 ```
 
-### 🗄️ Step 2: Initialize the Database (CRITICAL FIRST RUN ONLY)
-Because KFintech Nexus enforces strict enterprise security using **ACID MongoDB Transactions**, the database requires a Replica Set to function. Wait 10 seconds after running `docker-compose up`, then run this exact command in your terminal to activate it:
-```bash
-docker exec kfintech_mongo mongosh --eval "rs.initiate()"
-```
-
 ---
 
 ## 🧪 Experience the Workflow

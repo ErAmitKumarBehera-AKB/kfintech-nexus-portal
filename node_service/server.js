@@ -21,6 +21,19 @@ mongoose.connect(MONGODB_URI)
         try {
             console.log('🔄 Initializing system dependencies...');
             
+            try {
+                await mongoose.connection.db.admin().command({ replSetInitiate: {} });
+                console.log("🗄️ MongoDB Replica Set Initialized automatically!");
+                // Wait 2 seconds for primary election
+                await new Promise(r => setTimeout(r, 2000));
+            } catch(e) {
+                if (e.codeName === 'AlreadyInitialized') {
+                    // Ignore already initialized
+                } else {
+                    console.log("🗄️ Replica Set init note:", e.message);
+                }
+            }
+            
             // 1. Seed dummy user so Investor has a mock Email & SMS
             require('./seed_user'); 
             
