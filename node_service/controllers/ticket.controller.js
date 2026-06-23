@@ -43,21 +43,40 @@ exports.createTicket = async (req, res) => {
             const rawResponse = chatResponse.data.response;
             
             // Try to parse the JSON string
+            let parsedSuccessfully = false;
             try {
-                const parsed = JSON.parse(rawResponse);
+                // Strip markdown code blocks if Ollama included them
+                let cleanJson = rawResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+                const parsed = JSON.parse(cleanJson);
+                
                 if (parsed && Array.isArray(parsed.bullets)) {
                     aiSummary = parsed.bullets;
+                    parsedSuccessfully = true;
+                } else if (parsed && typeof parsed.bullets === 'string') {
+                    // Sometimes Ollama stringifies the array
+                    const innerParsed = JSON.parse(parsed.bullets.replace(/\]\]/g, ']')); // fix common hallucination
+                    if (Array.isArray(innerParsed)) {
+                        aiSummary = innerParsed;
+                        parsedSuccessfully = true;
+                    }
                 }
             } catch (e) {
+                console.warn("Primary JSON parse failed:", e.message);
+            }
+                
+            if (!parsedSuccessfully) {
                 // Fallback if JSON parsing fails despite the prompt
                 aiSummary = rawResponse.split('\n')
-                    .map(line => line.replace(/^(\d+\.|[-*•])\s*/g, '').replace(/\*+/g, '').trim())
-                    .filter(line => line.length > 5 && !line.toLowerCase().includes("here are") && !line.toLowerCase().includes("bullet points"));
+                    .map(line => line.replace(/^(\d+\.|[-*•])\s*/g, '').replace(/[\*"{}\[\]]/g, '').trim())
+                    .filter(line => line.length > 5 && !line.toLowerCase().includes("here are") && !line.toLowerCase().includes("bullet points") && !line.toLowerCase().includes("bullets:"));
             }
                 
             // Truncate strictly to 3 bullets
             if (aiSummary.length > 3) aiSummary = aiSummary.slice(0, 3);
-            if (aiSummary.length === 0) aiSummary = [rawResponse.replace(/\*+/g, '')];
+            if (aiSummary.length === 0) {
+                // Absolute fallback to clean string
+                aiSummary = [rawResponse.replace(/[\*"{}\[\]]/g, '').trim()];
+            }
         } catch (error) {
             console.error("Ollama Error:", error.message);
             aiSummary = ["Ollama AI Engine not reachable.", "Using default static insights.", "Sentiment flags potential churn."];
