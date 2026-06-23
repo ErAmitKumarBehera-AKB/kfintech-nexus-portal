@@ -27,7 +27,12 @@ async function seedUser() {
     );
     
     console.log("Seeded User:", user);
-    process.exit(0);
 }
 
-seedUser();
+// Only execute directly if not required by another file
+if (require.main === module) {
+    seedUser().then(() => process.exit(0));
+} else {
+    seedUser();
+}
+module.exports = seedUser;

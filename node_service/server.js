@@ -14,7 +14,24 @@ app.use(express.json());
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27018/kfintech_nexus?directConnection=true';
 
 mongoose.connect(MONGODB_URI)
-    .then(() => console.log('✅ Successfully connected to MongoDB Database.'))
+    .then(async () => {
+        console.log('✅ Successfully connected to MongoDB Database.');
+        
+        // --- START AUTOMATED INITIALIZATION ---
+        try {
+            console.log('🔄 Initializing system dependencies...');
+            
+            // 1. Seed dummy user so Investor has a mock Email & SMS
+            require('./seed_user'); 
+            
+            // 2. Initialize AWS LocalStack (S3 Bucket, SES Verification)
+            require('./test_localstack');
+            
+        } catch (initErr) {
+            console.log('⚠️ Non-critical warning during initialization:', initErr.message);
+        }
+        // --- END AUTOMATED INITIALIZATION ---
+    })
     .catch((err) => {
         console.error('❌ MongoDB connection error:', err);
         process.exit(1);
