@@ -1,113 +1,118 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 const { sendSMS } = require('../services/snsService');
 const { sendEmail } = require('../services/sesService');
 
-// Simulated User Database to represent MongoDB schema
-const mockUserDB = {
-    "investor@kfintech.com": {
-        id: "usr_101",
-        role: "INVESTOR",
-        // Represents "securePassword123" hashed
-        passwordHash: "$2b$10$X...yourHashHere" 
-    },
-    "admin1@kfintech.com": {
-        id: "usr_202",
-        role: "ADMIN_L1",
-        passwordHash: "$2b$10$Y...yourHashHere"
-    },
-    "admin2@kfintech.com": {
-        id: "usr_999",
-        role: "ADMIN_L2",
-        passwordHash: "$2b$10$Z...yourHashHere"
-    }
-};
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_dev_secret_kfintech_2026';
+const JWT_EXPIRES_IN = '8h';
 
-/**
- * 🔒 MFA / OTP Generation using AWS LocalStack (SNS or SES).
- */
 const generateAndSendOTP = async (phoneNumberOrEmail) => {
     const otp = Math.floor(100000 + Math.random() * 900000);
     console.log(`[AWS LocalStack] 📲 Sending 6-digit OTP ${otp} to ${phoneNumberOrEmail}`);
-    
+
     try {
         if (phoneNumberOrEmail.includes('@')) {
             await sendEmail({
                 to: phoneNumberOrEmail,
-                subject: 'Your Login OTP',
-                message: `<h1>Your OTP is: <strong>${otp}</strong></h1><p>Please do not share this with anyone.</p>`
+                subject: 'Your KFintech Login OTP',
+                message: `<h1>Your OTP is: <strong>${otp}</strong></h1><p>Valid for 10 minutes. Do not share this with anyone.</p>`
             });
         } else {
             await sendSMS({
-                phoneNumber: phoneNumberOrEmail, // Make sure it's a valid format like +1234567890 if not testing
-                message: `Your login OTP is: ${otp}. Do not share it.`
+                phoneNumber: phoneNumberOrEmail,
+                message: `Your KFintech login OTP is: ${otp}. Do not share it.`
             });
         }
     } catch (error) {
-        console.error("Failed to send OTP via AWS LocalStack:", error);
-        // We can swallow the error or throw it based on requirements
+        // Non-critical: OTP send failure should not block login in dev/test
+        console.error('[OTP] Failed to send OTP via AWS LocalStack:', error.message);
     }
-    
+
     return otp;
 };
 
-/**
- * 🔑 Single Smart Gateway: User Login Logic
- * Includes password verification and RBAC JWT Token issuance.
- */
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // 1. Input Validation
+        // 1. Input validation
         if (!email || !password) {
-            return res.status(400).json({ message: "Email and password are required." });
+            return res.status(400).json({ message: 'Email and password are required.' });
         }
 
-        // 2. Locate User (In production: await User.findOne({ email }))
-        const user = mockUserDB[email];
+        // 2. Locate user — explicitly select passwordHash (excluded by default via select:false)
+        const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+passwordHash');
         if (!user) {
-            return res.status(401).json({ message: "Invalid credentials." });
+            return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
-        // 3. Cryptographic Password Verification
-        // Note: For this mock, we assume success if passing 'mock_password' or use bcrypt
-        let isMatch = false;
-        if (password === 'mock_password') {
-            isMatch = true; // Temporary bypass for testing without real hashes
-        } else {
-            // Real verification:
-            // isMatch = await bcrypt.compare(password, user.passwordHash);
+        // 3. Check if account is active
+        if (!user.isActive) {
+            return res.status(403).json({ message: 'Account is disabled. Contact your administrator.' });
         }
 
+        // 4. Cryptographic password verification
+        const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) {
-            return res.status(401).json({ message: "Invalid credentials." });
+            return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
-        // 4. (Bonus) Trigger 6-Digit OTP for Multi-Factor Authentication
-        const otpSent = await generateAndSendOTP(email);
+        // 5. MFA Notification
+        try {
+            await generateAndSendOTP(user.email);
+        } catch (otpErr) {
+            console.warn('[OTP] Skipped OTP step:', otpErr.message);
+        }
 
-        // 5. Issue Role-Based Access Control (RBAC) Token
-        // Roles matrix: INVESTOR, ADMIN_L1, ADMIN_L2
+        // 6. Issue RBAC JWT token
         const payload = {
-            userId: user.id,
-            role: user.role
+            userId: user._id.toString(),
+            role: user.role,
+            name: user.name,
+            email: user.email
         };
 
-        const JWT_SECRET = process.env.JWT_SECRET || 'fallback_dev_secret_kfintech_2026';
-        
-        // Sign token valid for 8 hours
-        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
+        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
         return res.status(200).json({
-            message: "Login successful. Please verify OTP if required.",
+            message: 'Login successful.',
             accessToken: token,
-            rbacRole: user.role,
-            requiresOtp: true 
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            }
         });
 
     } catch (error) {
-        console.error("Authentication Gateway Error:", error);
-        return res.status(500).json({ message: "Internal server error." });
+        console.error('[Auth] Login error:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
     }
+};
+
+exports.me = async (req, res) => {
+    try {
+        // req.user is populated by the authenticate middleware
+        const user = await User.findById(req.user.userId);
+        if (!user || !user.isActive) {
+            return res.status(401).json({ message: 'User not found or account disabled.' });
+        }
+
+        return res.status(200).json({
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            }
+        });
+    } catch (error) {
+        console.error('[Auth] /me error:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+};
+exports.logout = async (req, res) => {
+    return res.status(200).json({ message: 'Logged out successfully.' });
 };

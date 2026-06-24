@@ -1,23 +1,40 @@
 import axios from 'axios';
 
-// Mock JWT Token mimicking a secure authentication payload
-const MOCK_JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.MockPayloadForTestingProtectedRoutes.KFintechSignature123";
-
 // Create an Axios instance pointing to the Node.js CRM Backend
 const apiClient = axios.create({
-    // User requested localhost:5000 (Ensure your node backend runs on 5000 or modify this to 3000 if needed)
-    baseURL: 'http://localhost:5000/api', 
+    baseURL: 'http://localhost:5000/api',
     headers: {
         'Content-Type': 'application/json'
     }
 });
 
-// Axios Request Interceptor: Automatically attach the JWT token to every request
-apiClient.interceptors.request.use((config) => {
-    config.headers.Authorization = `Bearer ${MOCK_JWT_TOKEN}`;
-    return config;
-}, (error) => {
-    return Promise.reject(error);
-});
+// Request Interceptor: attach the real JWT token from localStorage on every request
+apiClient.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('kfintech_token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
+// Response Interceptor: handle 401 Unauthorized globally
+// If the server rejects the token (expired, invalid), clear the session and redirect to login
+apiClient.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            // Avoid redirect loops on the login page itself
+            if (!window.location.pathname.includes('/login')) {
+                localStorage.removeItem('kfintech_token');
+                localStorage.removeItem('kfintech_user');
+                window.location.href = '/login';
+            }
+        }
+        return Promise.reject(error);
+    }
+);
 
 export default apiClient;

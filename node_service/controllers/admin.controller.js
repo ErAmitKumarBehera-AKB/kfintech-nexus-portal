@@ -9,7 +9,7 @@ exports.verifyInvestorDocument = async (req, res) => {
     const file = req.file;
     const { accountNumber, ticketId } = req.body;
     
-    // Injecting a fallback mock admin ID
+    // A fallback mock admin ID
     const adminId = req.user ? req.user.id : new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a01'); 
 
     if (!file) {
@@ -122,6 +122,50 @@ exports.escalateTicket = async (req, res) => {
         
         return res.status(200).json({ message: "Successfully escalated to L2 Checker.", ticket });
     } catch(err) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(500).json({ error: err.message });
+    }
+};
+
+exports.rejectTicket = async (req, res) => {
+    // 1. Extract data
+    const { id } = req.params;
+    const { notes } = req.body;
+    // Injecting a fallback mock admin ID
+    const adminId = req.user ? req.user.id : new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a01');
+
+    // 2. Wrap entire logic in a strict MongoDB ACID Transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const ticket = await Ticket.findById(id).session(session);
+        if (!ticket) throw new Error('Ticket not found.');
+
+        // 3. Update Status
+        const previousStatus = ticket.status;
+        ticket.status = 'REJECTED';
+        await ticket.save({ session });
+
+        // 4. Securely write final state to AuditLog
+        const auditLog = new AuditLog({
+            entityId: ticket._id,
+            entityType: 'Ticket',
+            action: 'L1_TICKET_REJECTED',
+            performedBy: adminId,
+            details: { previousStatus, newStatus: 'REJECTED', note: notes || 'Rejected by L1 Maker.' }
+        });
+
+        await auditLog.save({ session });
+        
+        // 5. Commit Transaction
+        await session.commitTransaction();
+        session.endSession();
+
+        return res.status(200).json({ message: 'Ticket rejected by L1 Maker.', ticket });
+    } catch (err) {
+        // 6. Transaction Rollback
         await session.abortTransaction();
         session.endSession();
         return res.status(500).json({ error: err.message });

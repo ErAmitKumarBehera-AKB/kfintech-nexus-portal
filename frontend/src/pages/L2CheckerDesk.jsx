@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import apiClient from '../api/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, XCircle, CheckCircle, Cpu, AlertTriangle, Activity } from 'lucide-react';
+import { ShieldCheck, XCircle, CheckCircle, Cpu, AlertTriangle, Activity, ChevronDown, FileText, User, Hash } from 'lucide-react';
+import { getServiceType } from '../config/serviceTypes';
 
 // Shared UI Components for AI Insights
 const Badge = ({ priority }) => {
@@ -16,6 +17,18 @@ const Badge = ({ priority }) => {
     );
 };
 
+const ServiceTypeBadge = ({ serviceType }) => {
+    const config = getServiceType(serviceType || 'COMPLAINT');
+    const Icon = config.icon;
+    return (
+        <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest shadow-sm border flex items-center gap-1 ${config.colorClasses.badge}`}>
+            <Icon className="w-3 h-3" />
+            {config.label}
+        </span>
+    );
+};
+const stripPrefix = (text) => (text || '').replace(/^\[[A-Z_]+\]\s*/, '');
+
 const SentimentBar = ({ score }) => {
     const percentage = Math.min(Math.max((score || 0) * 100, 0), 100);
     const isHighFrustration = percentage > 70;
@@ -23,7 +36,7 @@ const SentimentBar = ({ score }) => {
     return (
         <div className="mt-4">
             <div className="flex justify-between text-xs mb-2 font-bold text-gray-400 uppercase tracking-wider items-center">
-                <span className="flex items-center gap-1"><Activity className="w-4 h-4" /> AI Frustration Index</span>
+                <span className="flex items-center gap-1"><Activity className="w-4 h-4" /> Customer Dissatisfaction Index</span>
                 <span className={isHighFrustration ? 'text-red-400 font-mono text-sm' : 'text-emerald-400 font-mono text-sm'}>{percentage.toFixed(1)}%</span>
             </div>
             <div className="w-full bg-kfintech-bg/80 rounded-full h-3 overflow-hidden shadow-inner border border-kfintech-border/50">
@@ -69,6 +82,14 @@ const L2CheckerDesk = () => {
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [expandedId, setExpandedId] = useState(null);
+    const [pendingReturn, setPendingReturn] = useState({ id: null, note: '' });
+
+    const toggleExpanded = (id) => setExpandedId(prev => prev === id ? null : id);
+
+    const handleReturnToL1 = (ticketId) => {
+        setPendingReturn({ id: ticketId, note: '' });
+    };
 
     useEffect(() => {
         const fetchL2Queue = async () => {
@@ -98,10 +119,11 @@ const L2CheckerDesk = () => {
         fetchL2Queue();
     }, []);
 
-    const handleAction = async (ticketId, action) => {
+    const handleAction = async (ticketId, action, notes = '') => {
         try {
-            await apiClient.post('/l2/finalize', { ticketId, action });
+            await apiClient.post('/l2/finalize', { ticketId, action, notes });
             setTickets(current => current.filter(t => t._id !== ticketId));
+            setPendingReturn({ id: null, note: '' });
         } catch (err) {
             alert(`Failed to execute ${action}. ${err.response?.data?.message || err.message}`);
         }
@@ -174,12 +196,13 @@ const L2CheckerDesk = () => {
                                         <div className="font-mono text-sm text-gray-300 font-semibold mt-1">#{ticket._id}</div>
                                     </div>
                                     <div className="flex flex-col items-end gap-2">
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 flex-wrap justify-end">
                                             {ticket.isPotentialFraud && (
                                                 <span className="px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest shadow-sm flex items-center gap-1 bg-orange-500/20 text-orange-400 border border-orange-500/50 animate-pulse">
                                                     <AlertTriangle className="w-3 h-3" /> POTENTIAL FRAUD
                                                 </span>
                                             )}
+                                            <ServiceTypeBadge serviceType={ticket.serviceType} />
                                             <Badge priority={ticket.assignedPriority} />
                                         </div>
                                         <div className="text-xs font-mono font-bold tracking-tight">
@@ -190,10 +213,31 @@ const L2CheckerDesk = () => {
 
                                 <div className="p-6 flex-grow">
                                     <div className="mb-6">
-                                        <h4 className="text-xs font-bold uppercase text-gray-500 tracking-widest mb-3">Original Investor Complaint</h4>
+                                        <h4 className="text-xs font-bold uppercase text-gray-500 tracking-widest mb-3">
+                                            Request Description
+                                        </h4>
                                         <p className="text-gray-200 text-md bg-kfintech-bg/50 p-5 rounded-xl border border-kfintech-border leading-relaxed font-medium italic shadow-inner">
-                                            "{ticket.complaintText}"
+                                            "{stripPrefix(ticket.complaintText)}"
                                         </p>
+                                        {/* Service Metadata Summary — shows type-specific submitted fields */}
+                                        {ticket.serviceMetadata && Object.keys(ticket.serviceMetadata).length > 0 && (() => {
+                                            const stConfig = getServiceType(ticket.serviceType);
+                                            return (
+                                                <div className={`mt-3 p-4 rounded-xl border ${stConfig.colorClasses.card} ${stConfig.colorClasses.activeBorder}`}>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {Object.entries(ticket.serviceMetadata).map(([k, v]) => {
+                                                            const fieldDef = stConfig.requiredFields.find(f => f.name === k);
+                                                            return (
+                                                                <div key={k} className="bg-kfintech-bg/60 p-2.5 rounded-lg border border-kfintech-border">
+                                                                    <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-0.5">{fieldDef?.label || k}</p>
+                                                                    <p className="text-xs text-white font-medium">{v || '—'}</p>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
 
                                     <div className="bg-kfintech-primary/5 rounded-xl p-6 border border-kfintech-primary/20 shadow-inner relative overflow-hidden">
@@ -222,24 +266,154 @@ const L2CheckerDesk = () => {
                                         <SentimentBar score={ticket.aiSentimentScore} />
                                     </div>
                                 </div>
+                                <AnimatePresence>
+                                    {expandedId === ticket._id && (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            transition={{ duration: 0.25, ease: 'easeInOut' }}
+                                            className="overflow-hidden border-t border-kfintech-border/50"
+                                        >
+                                            <div className="p-6 space-y-4 bg-kfintech-bg/30">
+                                                <p className="text-[10px] font-extrabold text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+                                                    <FileText className="w-3.5 h-3.5" /> Full Request — L1 View
+                                                </p>
 
-                                <div className="px-6 py-5 bg-kfintech-bg/50 border-t border-kfintech-border/50 flex justify-end gap-4 group-hover:bg-kfintech-bg transition-colors">
-                                    <motion.button 
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={() => handleAction(ticket._id, 'REJECT')}
-                                        className="flex items-center gap-2 px-6 py-3 border border-red-500/30 text-red-400 bg-red-500/5 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] font-bold transition-all text-sm uppercase tracking-wider"
+                                                {/* Investor identity grid */}
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="bg-kfintech-bg/60 p-4 rounded-xl border border-kfintech-border shadow-inner">
+                                                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                                            <User className="w-3 h-3" /> Investor Name
+                                                        </p>
+                                                        <p className="text-white font-semibold text-sm">{ticket.investorName || 'Unknown'}</p>
+                                                    </div>
+                                                    <div className="bg-kfintech-bg/60 p-4 rounded-xl border border-kfintech-border shadow-inner">
+                                                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                                            <Hash className="w-3 h-3" /> Account Number
+                                                        </p>
+                                                        <p className="text-white font-mono font-semibold text-sm">{ticket.accountNumber || 'Not Provided'}</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Document */}
+                                                <div className={`flex items-center gap-3 p-4 rounded-xl border ${
+                                                    ticket.documentName
+                                                        ? 'bg-kfintech-primary/5 border-kfintech-primary/20'
+                                                        : 'bg-kfintech-bg/40 border-kfintech-border/40'
+                                                }`}>
+                                                    <FileText className={`w-5 h-5 shrink-0 ${
+                                                        ticket.documentName ? 'text-kfintech-primary' : 'text-gray-600'
+                                                    }`} />
+                                                    <div>
+                                                        <p className="text-[10px] font-extrabold text-gray-500 uppercase tracking-widest">Attached Document</p>
+                                                        <p className={`text-sm font-medium ${
+                                                            ticket.documentName ? 'text-blue-300' : 'text-gray-600'
+                                                        }`}>
+                                                            {ticket.documentName || 'No document attached'}
+                                                        </p>
+                                                        {ticket.documentName && (
+                                                            <p className="text-[10px] text-gray-500 mt-0.5">AES-256 Encrypted · OCR verified by L1</p>
+                                                        )}
+                                                    </div>
+                                                    {ticket.ocrMatchVerified !== undefined && (
+                                                        <span className={`ml-auto text-[10px] font-extrabold uppercase tracking-widest px-2 py-1 rounded border ${
+                                                            ticket.ocrMatchVerified
+                                                                ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+                                                                : 'text-red-400 bg-red-500/10 border-red-500/30'
+                                                        }`}>
+                                                            {ticket.ocrMatchVerified ? 'OCR Verified' : 'OCR Failed'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
+                                {/* Return-to-L1 Note Panel */}
+                                <AnimatePresence>
+                                    {pendingReturn.id === ticket._id && (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            transition={{ duration: 0.22, ease: 'easeInOut' }}
+                                            className="overflow-hidden border-t border-amber-500/30"
+                                        >
+                                            <div className="p-5 bg-amber-500/5 space-y-3">
+                                                <p className="text-xs font-extrabold text-amber-400 uppercase tracking-widest flex items-center gap-2">
+                                                    <XCircle className="w-3.5 h-3.5" />
+                                                    Reason for Returning to L1
+                                                </p>
+                                                <textarea
+                                                    rows={3}
+                                                    autoFocus
+                                                    placeholder="Describe what L1 needs to fix or clarify before this can be approved..."
+                                                    value={pendingReturn.note}
+                                                    onChange={e => setPendingReturn(prev => ({ ...prev, note: e.target.value }))}
+                                                    className="w-full bg-kfintech-bg border border-amber-500/30 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/50 outline-none transition-all shadow-inner resize-none"
+                                                />
+                                                <div className="flex justify-end gap-3">
+                                                    <button
+                                                        onClick={() => setPendingReturn({ id: null, note: '' })}
+                                                        className="px-5 py-2.5 text-xs font-bold text-gray-400 hover:text-white uppercase tracking-wider transition-colors"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <motion.button
+                                                        whileHover={{ scale: 1.02 }}
+                                                        whileTap={{ scale: 0.98 }}
+                                                        onClick={() => handleAction(ticket._id, 'RETURN_TO_L1', pendingReturn.note)}
+                                                        className="flex items-center gap-2 px-6 py-2.5 bg-amber-500 text-white rounded-xl font-extrabold text-xs uppercase tracking-wider shadow-[0_0_12px_rgba(245,158,11,0.4)] hover:bg-amber-400 transition-all"
+                                                    >
+                                                        <XCircle className="w-3.5 h-3.5" /> Confirm Return to L1
+                                                    </motion.button>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
+                                <div className="px-6 py-5 bg-kfintech-bg/50 border-t border-kfintech-border/50 flex justify-between items-center gap-3 group-hover:bg-kfintech-bg transition-colors">
+                                    {/* View Full Request toggle */}
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => toggleExpanded(ticket._id)}
+                                        className="flex items-center gap-2 px-4 py-2.5 border border-kfintech-border text-gray-400 bg-kfintech-bg/60 rounded-xl hover:border-kfintech-primary/40 hover:text-kfintech-primary font-bold transition-all text-xs uppercase tracking-wider"
                                     >
-                                        <XCircle className="w-4 h-4" /> Reject to L1
+                                        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedId === ticket._id ? 'rotate-180' : ''}`} />
+                                        {expandedId === ticket._id ? 'Collapse' : 'View Full Request'}
                                     </motion.button>
-                                    <motion.button 
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={() => handleAction(ticket._id, 'APPROVE')}
-                                        className="flex items-center gap-2 px-8 py-3 bg-kfintech-primary text-white rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.4)] hover:bg-blue-500 hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] font-bold transition-all text-sm uppercase tracking-wider"
-                                    >
-                                        <CheckCircle className="w-4 h-4" /> Approve & Resolve
-                                    </motion.button>
+
+                                    {/* Action buttons */}
+                                    <div className="flex gap-3">
+                                        <motion.button
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            onClick={() => handleReturnToL1(ticket._id)}
+                                            className="flex items-center gap-2 px-5 py-3 border border-amber-500/30 text-amber-400 bg-amber-500/5 rounded-xl hover:bg-amber-500/15 hover:border-amber-500/50 hover:shadow-[0_0_12px_rgba(245,158,11,0.25)] font-bold transition-all text-sm uppercase tracking-wider"
+                                        >
+                                            <XCircle className="w-4 h-4" /> Return to L1
+                                        </motion.button>
+                                        <motion.button
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            onClick={() => handleAction(ticket._id, 'REJECT')}
+                                            className="flex items-center gap-2 px-5 py-3 border border-red-500/30 text-red-400 bg-red-500/5 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_12px_rgba(239,68,68,0.3)] font-bold transition-all text-sm uppercase tracking-wider"
+                                        >
+                                            <ShieldCheck className="w-4 h-4 rotate-180" /> Reject Request
+                                        </motion.button>
+                                        <motion.button
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            onClick={() => handleAction(ticket._id, 'APPROVE')}
+                                            className="flex items-center gap-2 px-8 py-3 bg-kfintech-primary text-white rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.4)] hover:bg-blue-500 hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] font-bold transition-all text-sm uppercase tracking-wider"
+                                        >
+                                            <CheckCircle className="w-4 h-4" /> Approve & Resolve
+                                        </motion.button>
+                                    </div>
                                 </div>
                             </motion.div>
                         ))}

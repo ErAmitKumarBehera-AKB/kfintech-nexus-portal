@@ -51,6 +51,19 @@ const TicketSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    serviceType: {
+        type: String,
+        enum: ['COMPLAINT', 'BANK_UPDATE', 'NOMINEE_UPDATE', 'ADDRESS_UPDATE', 'EMAIL_UPDATE', 'MOBILE_UPDATE', 'KYC_UPDATE'],
+        default: 'COMPLAINT'
+    },
+    serviceMetadata: {
+        type: Object,
+        default: {}
+    },
+    l2ReturnNote: {
+        type: String,
+        default: null
+    },
     status: {
         type: String,
         enum: ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'L1_REVIEW', 'L2_APPROVAL', 'APPROVED', 'REJECTED'],

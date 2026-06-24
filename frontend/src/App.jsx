@@ -1,70 +1,98 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import L2CheckerDesk from './pages/L2CheckerDesk';
+import { AuthProvider, useAuth, getRoleDefaultRoute } from './context/AuthContext';
+
+import Navbar from './components/Navbar';
+import ProtectedRoute from './components/ProtectedRoute';
+
+import LoginPage from './pages/LoginPage';
 import InvestorDashboard from './pages/InvestorDashboard';
 import L1MakerDesk from './pages/L1MakerDesk';
-import Navbar from './components/Navbar';
+import L2CheckerDesk from './pages/L2CheckerDesk';
+import AdminDashboard from './pages/AdminDashboard';
 
-// Protected Route Guard Wrapper
-const ProtectedRoute = ({ children, requiredRole, userRole }) => {
-    if (!userRole) return <Navigate to="/login" replace />;
-    
-    if (requiredRole && userRole !== requiredRole) {
-        return (
-            <div className="p-8 text-red-600 text-xl font-bold flex items-center justify-center min-h-[50vh]">
-                Access Denied. Insufficient RBAC Permissions for this Dashboard.
-            </div>
-        );
-    }
-    
-    return children;
-};
+const AppRoutes = () => {
+    const { user, isAuthenticated } = useAuth();
 
-const getInitialRole = () => {
-    const path = window.location.pathname;
-    if (path.includes('investor')) return 'INVESTOR';
-    if (path.includes('l2-checker')) return 'ADMIN_L2';
-    return 'ADMIN_L1';
+    return (
+        <div className="min-h-screen bg-kfintech-bg font-sans flex flex-col">
+            {/* Navbar is only shown when the user is logged in */}
+            {isAuthenticated && <Navbar />}
+
+            <main className={`flex-grow ${isAuthenticated ? 'container mx-auto max-w-7xl mt-6' : ''}`}>
+                <Routes>
+                    {/* ── Public Routes ── */}
+                    <Route
+                        path="/login"
+                        element={
+                            // If already logged in, redirect away from login page
+                            isAuthenticated
+                                ? <Navigate to={getRoleDefaultRoute(user?.role)} replace />
+                                : <LoginPage />
+                        }
+                    />
+
+                    {/* ── Protected: Investor ── */}
+                    <Route
+                        path="/investor"
+                        element={
+                            <ProtectedRoute allowedRoles={['INVESTOR', 'ADMIN_SUPER']}>
+                                <InvestorDashboard />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* ── Protected: L1 Maker Desk ── */}
+                    <Route
+                        path="/l1-maker"
+                        element={
+                            <ProtectedRoute allowedRoles={['ADMIN_L1', 'ADMIN_SUPER']}>
+                                <L1MakerDesk />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* ── Protected: L2 Checker Desk ── */}
+                    <Route
+                        path="/l2-checker"
+                        element={
+                            <ProtectedRoute allowedRoles={['ADMIN_L2', 'ADMIN_SUPER']}>
+                                <L2CheckerDesk />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* ── Protected: Super Admin Center ── */}
+                    <Route
+                        path="/admin"
+                        element={
+                            <ProtectedRoute allowedRoles={['ADMIN_SUPER']}>
+                                <AdminDashboard />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* ── Fallback: redirect to role home or login ── */}
+                    <Route
+                        path="*"
+                        element={
+                            isAuthenticated
+                                ? <Navigate to={getRoleDefaultRoute(user?.role)} replace />
+                                : <Navigate to="/login" replace />
+                        }
+                    />
+                </Routes>
+            </main>
+        </div>
+    );
 };
 
 function App() {
-    // Centralized Mock Authentication State synced with URL path
-    const [role, setRole] = useState(getInitialRole());
-
     return (
         <BrowserRouter>
-            <div className="min-h-screen bg-kfintech-bg font-sans flex flex-col">
-                {/* Global KFintech Navigation Bar */}
-                <Navbar currentRole={role} setRole={setRole} />
-
-                <main className="container mx-auto max-w-7xl flex-grow mt-6">
-                    <Routes>
-                        <Route path="/investor" element={
-                            <ProtectedRoute userRole={role} requiredRole="INVESTOR">
-                                <InvestorDashboard />
-                            </ProtectedRoute>
-                        } />
-                        
-                        <Route path="/l1-maker" element={
-                            <ProtectedRoute userRole={role} requiredRole="ADMIN_L1">
-                                <L1MakerDesk />
-                            </ProtectedRoute>
-                        } />
-                        
-                        <Route path="/l2-checker" element={
-                            <ProtectedRoute userRole={role} requiredRole="ADMIN_L2">
-                                {/* Fully wired, production-ready L2 Component */}
-                                <L2CheckerDesk />
-                            </ProtectedRoute>
-                        } />
-
-                        {/* Smart fallback routing based on current role */}
-                        <Route path="*" element={
-                            <Navigate to={role === 'INVESTOR' ? '/investor' : role === 'ADMIN_L1' ? '/l1-maker' : '/l2-checker'} replace />
-                        } />
-                    </Routes>
-                </main>
-            </div>
+            <AuthProvider>
+                <AppRoutes />
+            </AuthProvider>
         </BrowserRouter>
     );
 }

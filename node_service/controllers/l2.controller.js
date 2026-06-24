@@ -5,17 +5,17 @@ const { sendEmail } = require('../services/sesService');
 const { sendSMS } = require('../services/snsService');
 
 exports.finalizeTicket = async (req, res) => {
-    const { ticketId, action } = req.body;
+    const { ticketId, action, notes } = req.body;
     
     // Fallback mock ID for L2 Admin Checker
     const adminId = req.user ? req.user.id : new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a02');
 
     if (!ticketId || !action) {
-        return res.status(400).json({ message: "ticketId and action (APPROVE or REJECT) are required fields." });
+        return res.status(400).json({ message: "ticketId and action are required fields." });
     }
 
-    if (!['APPROVE', 'REJECT'].includes(action)) {
-        return res.status(400).json({ message: "Invalid action. Must be exactly 'APPROVE' or 'REJECT'." });
+    if (!['APPROVE', 'REJECT', 'RETURN_TO_L1'].includes(action)) {
+        return res.status(400).json({ message: "Invalid action. Must be 'APPROVE', 'REJECT', or 'RETURN_TO_L1'." });
     }
 
     // 1. Strict MongoDB ACID Multi-Document Transaction
@@ -30,22 +30,32 @@ exports.finalizeTicket = async (req, res) => {
         }
 
         const previousStatus = ticket.status;
-        const newStatus = action === 'APPROVE' ? 'RESOLVED' : 'CLOSED';
+        let newStatus;
+        if (action === 'APPROVE')        newStatus = 'RESOLVED';
+        else if (action === 'REJECT')    newStatus = 'REJECTED';
+        else                             newStatus = 'L1_REVIEW'; // RETURN_TO_L1
 
-        // 3. Update Status
+        // 3. Update Status — and persist L2 return note if applicable
         ticket.status = newStatus;
+        if (action === 'RETURN_TO_L1' && notes) {
+            ticket.l2ReturnNote = notes;
+        } else if (action !== 'RETURN_TO_L1') {
+            ticket.l2ReturnNote = null; // clear on final resolution
+        }
         await ticket.save({ session });
 
         // 4. Securely write final state to AuditLog
         const auditLog = new AuditLog({
             entityId: ticket._id,
             entityType: 'Ticket',
-            action: action === 'APPROVE' ? 'L2_TICKET_APPROVED' : 'L2_TICKET_REJECTED',
-            performedBy: adminId, // L2 Checker ID
+            action: action === 'APPROVE' ? 'L2_TICKET_APPROVED'
+                  : action === 'REJECT'  ? 'L2_TICKET_REJECTED'
+                  :                        'L2_RETURNED_TO_L1',
+            performedBy: adminId,
             details: {
                 previousStatus,
                 newStatus,
-                note: `L2 Checker executed the ${action} action. Ticket finalized.`
+                note: notes || `L2 Checker executed the ${action} action.`
             }
         });
 
@@ -60,7 +70,9 @@ exports.finalizeTicket = async (req, res) => {
             const investor = ticket.investorId;
             const userEmail = investor ? investor.email : null;
             const userPhone = investor ? investor.phoneNumber : null;
-            const msgStatus = action === 'APPROVE' ? 'APPROVED and RESOLVED' : 'REJECTED and CLOSED';
+            const msgStatus = action === 'APPROVE' ? 'APPROVED and RESOLVED'
+                            : action === 'REJECT'  ? 'REJECTED'
+                            :                        'returned to L1 for rework';
             
             const subject = `Update on your Ticket: ${ticketId}`;
             const htmlMessage = `<h1>Hello ${ticket.investorName},</h1><p>Your ticket has been <strong>${msgStatus}</strong> by our L2 team.</p>`;

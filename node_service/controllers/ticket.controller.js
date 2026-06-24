@@ -9,9 +9,19 @@ const { uploadToS3 } = require('../services/s3Service');
 
 exports.createTicket = async (req, res) => {
     // 1. Extract data
-    const { complaintText, investorName = "Jane Doe", accountNumber = "123456789" } = req.body;
+    const { complaintText, investorName = "Jane Doe", accountNumber = "123456789", serviceType = 'COMPLAINT' } = req.body;
+    let serviceMetadata = {};
+    if (req.body.serviceMetadata) {
+        try {
+            serviceMetadata = typeof req.body.serviceMetadata === 'string'
+                ? JSON.parse(req.body.serviceMetadata)
+                : req.body.serviceMetadata;
+        } catch (e) {
+            serviceMetadata = {};
+        }
+    }
     const file = req.file;
-    
+
     const investorId = req.user ? req.user.id : new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a00'); 
 
     if (!complaintText) {
@@ -126,8 +136,11 @@ exports.createTicket = async (req, res) => {
             ocrExtractedText,
             ocrMatchVerified,
             isPotentialFraud: aiPayload.fraud_alert || false,
+            serviceType: serviceType || 'COMPLAINT',
+            serviceMetadata: serviceMetadata || {},
             status: 'OPEN'
         });
+
 
         await newTicket.save({ session });
 

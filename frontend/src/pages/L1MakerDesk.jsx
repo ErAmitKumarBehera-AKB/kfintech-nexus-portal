@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import apiClient from '../api/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Clock, ShieldAlert, Cpu, CheckCircle2, ChevronRight, FileText } from 'lucide-react';
+import { Clock, ShieldAlert, Cpu, CheckCircle2, ChevronRight, FileText, XCircle, AlertTriangle } from 'lucide-react';
+import { getServiceType } from '../config/serviceTypes';
 
 const PriorityBadge = ({ priority }) => (
     <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm ${
@@ -11,6 +12,19 @@ const PriorityBadge = ({ priority }) => (
         {priority || 'NORMAL'}
     </span>
 );
+
+const ServiceTypeBadge = ({ serviceType }) => {
+    const config = getServiceType(serviceType || 'COMPLAINT');
+    const Icon = config.icon;
+    return (
+        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm border flex items-center gap-1 ${config.colorClasses.badge}`}>
+            <Icon className="w-3 h-3" />
+            {config.label}
+        </span>
+    );
+};
+
+const stripPrefix = (text) => (text || '').replace(/^\[[A-Z_]+\]\s*/, '');
 
 const L1MakerDesk = () => {
     const [queue, setQueue] = useState([]);
@@ -26,7 +40,7 @@ const L1MakerDesk = () => {
                 const response = await apiClient.get('/dashboard/l1-queue');
                 let fetchedTickets = response.data.data || [];
                 
-                // Sort by Priority (CRITICAL > HIGH > NORMAL) and then by Oldest First (closest to SLA breach)
+                // Sort by Priority (CRITICAL > HIGH > NORMAL) and then by Oldest First 
                 const priorityWeight = { 'CRITICAL': 3, 'HIGH': 2, 'NORMAL': 1 };
                 fetchedTickets.sort((a, b) => {
                     const weightA = priorityWeight[a.assignedPriority || 'NORMAL'] || 1;
@@ -93,6 +107,20 @@ const L1MakerDesk = () => {
             setOcrResult(null);
         } catch (error) {
             alert(`Escalation failed: ${error.response?.data?.error || error.message}`);
+        }
+    };
+
+    const handleReject = async () => {
+        if (!selectedTicket) return;
+        if (!window.confirm('Reject this request? This action will permanently close the ticket.')) return;
+        try {
+            await apiClient.put(`/admin/reject/${selectedTicket._id}`, { notes });
+            setQueue(q => q.filter(t => t._id !== selectedTicket._id));
+            setSelectedTicket(null);
+            setNotes('');
+            setOcrResult(null);
+        } catch (error) {
+            alert(`Rejection failed: ${error.response?.data?.error || error.message}`);
         }
     };
 
@@ -170,16 +198,17 @@ const L1MakerDesk = () => {
                                     )}
                                     <div className="flex justify-between items-start mb-2">
                                         <span className="font-mono text-xs text-gray-400 font-semibold">#{ticket._id.substring(18)}</span>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 flex-wrap justify-end">
                                             {ticket.isPotentialFraud && (
                                                 <span className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm bg-orange-500/20 text-orange-400 border border-orange-500/50 animate-pulse">
                                                     ⚠️ FRAUD
                                                 </span>
                                             )}
+                                            <ServiceTypeBadge serviceType={ticket.serviceType} />
                                             <PriorityBadge priority={ticket.assignedPriority} />
                                         </div>
                                     </div>
-                                    <p className="text-sm font-medium text-gray-200 line-clamp-2 leading-snug group-hover:text-white transition-colors">{ticket.complaintText}</p>
+                                    <p className="text-sm font-medium text-gray-200 line-clamp-2 leading-snug group-hover:text-white transition-colors">{stripPrefix(ticket.complaintText)}</p>
                                     <div className="mt-3 flex justify-between items-center text-xs text-gray-500 font-semibold">
                                         <span className="uppercase text-kfintech-accent tracking-wider">{ticket.status}</span>
                                         <span className="flex items-center gap-1 bg-kfintech-bg px-2 py-1 rounded">
@@ -210,18 +239,35 @@ const L1MakerDesk = () => {
                                     <h3 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-3">
                                         Ticket Processing Workspace
                                     </h3>
-                                    <div className="flex gap-3 items-center">
+                                    <div className="flex gap-3 items-center flex-wrap justify-end">
                                         {selectedTicket.isPotentialFraud && (
                                             <span className="text-sm font-mono bg-orange-500/20 border border-orange-500/50 px-3 py-1 rounded text-orange-400 font-bold shadow-inner animate-pulse">
                                                 ⚠️ POTENTIAL FRAUD DETECTED
                                             </span>
                                         )}
+                                        <ServiceTypeBadge serviceType={selectedTicket.serviceType} />
+                                        <PriorityBadge priority={selectedTicket.assignedPriority} />
                                         <span className="text-sm font-mono bg-kfintech-primary/10 border border-kfintech-primary/30 px-3 py-1 rounded text-blue-300 font-bold shadow-inner">
                                             ID: {selectedTicket._id}
                                         </span>
                                     </div>
                                 </div>
                                 
+                                {/* L2 Return Note Banner */}
+                                {selectedTicket.l2ReturnNote && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -8 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="mb-6 flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.1)]"
+                                    >
+                                        <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-1">Returned by L2 Checker</p>
+                                            <p className="text-sm text-amber-200 leading-relaxed">{selectedTicket.l2ReturnNote}</p>
+                                        </div>
+                                    </motion.div>
+                                )}
+
                                 <div className="mb-6 grid grid-cols-2 gap-4">
                                     <div className="bg-kfintech-bg/50 p-4 rounded-xl border border-kfintech-border shadow-inner">
                                         <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Investor Name</h4>
@@ -235,11 +281,34 @@ const L1MakerDesk = () => {
 
                                 <div>
                                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                        <FileText className="w-4 h-4" /> Investor Complaint String
+                                        <FileText className="w-4 h-4" />
+                                        Request Description
                                     </h4>
                                     <p className="text-gray-300 text-md font-medium bg-kfintech-bg/50 p-5 rounded-xl border border-kfintech-border leading-relaxed shadow-inner">
-                                        {selectedTicket.complaintText}
+                                        {stripPrefix(selectedTicket.complaintText)}
                                     </p>
+                                    {/* Service Metadata Panel */}
+                                    {selectedTicket.serviceMetadata && Object.keys(selectedTicket.serviceMetadata).length > 0 && (() => {
+                                        const stConfig = getServiceType(selectedTicket.serviceType);
+                                        return (
+                                            <div className={`mt-4 p-4 rounded-xl border-2 ${stConfig.colorClasses.card} ${stConfig.colorClasses.activeBorder}`}>
+                                                <h5 className={`text-xs font-extrabold uppercase tracking-widest mb-3 ${stConfig.colorClasses.icon}`}>
+                                                    {stConfig.label} — Submitted Details
+                                                </h5>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {Object.entries(selectedTicket.serviceMetadata).map(([k, v]) => {
+                                                        const fieldDef = stConfig.requiredFields.find(f => f.name === k);
+                                                        return (
+                                                            <div key={k} className="bg-kfintech-bg/60 p-3 rounded-lg border border-kfintech-border">
+                                                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">{fieldDef?.label || k}</p>
+                                                                <p className="text-sm text-white font-medium">{v || '—'}</p>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
 
@@ -323,10 +392,15 @@ const L1MakerDesk = () => {
                                 onChange={(e) => setNotes(e.target.value)}
                                 className="w-full bg-kfintech-bg border border-kfintech-border rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-kfintech-primary/50 focus:border-kfintech-primary outline-none transition-colors shadow-inner resize-none"
                             />
-                            <div className="flex justify-end gap-4">
-                                <button className="px-6 py-3 text-sm font-bold text-gray-400 hover:text-white transition-colors uppercase tracking-wider">
-                                    Return to Queue
-                                </button>
+                            <div className="flex justify-end gap-3">
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={handleReject}
+                                    className="flex items-center gap-2 px-6 py-3 border border-red-500/40 text-red-400 bg-red-500/5 rounded-xl hover:bg-red-500/15 hover:border-red-500/60 hover:shadow-[0_0_12px_rgba(239,68,68,0.25)] font-bold transition-all text-sm uppercase tracking-wider"
+                                >
+                                    <XCircle className="w-4 h-4" /> Reject Request
+                                </motion.button>
                                 <motion.button 
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
