@@ -9,7 +9,8 @@ const { uploadToS3 } = require('../services/s3Service');
 
 exports.createTicket = async (req, res) => {
     // 1. Extract data
-    const { complaintText, investorName = "Jane Doe", accountNumber = "123456789", serviceType = 'COMPLAINT' } = req.body;
+    const { title, description, complaintText, investorName = "Jane Doe", accountNumber = "123456789", serviceType = 'COMPLAINT' } = req.body;
+    const finalDescription = description || complaintText || '';
     let serviceMetadata = {};
     if (req.body.serviceMetadata) {
         try {
@@ -24,8 +25,8 @@ exports.createTicket = async (req, res) => {
 
     const investorId = req.user ? req.user.id : new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a00'); 
 
-    if (!complaintText) {
-        return res.status(400).json({ message: "complaintText is required." });
+    if (!finalDescription) {
+        return res.status(400).json({ message: "description is required." });
     }
 
     const session = await mongoose.startSession();
@@ -37,7 +38,7 @@ exports.createTicket = async (req, res) => {
         // --- A. FinBERT Sentiment ---
         let aiPayload = { priority: 'NORMAL', score: 0.5, fraud_alert: false };
         try {
-            const aiResponse = await axios.post(`${mlServiceUrl}/sentiment/analyze`, { text: complaintText });
+            const aiResponse = await axios.post(`${mlServiceUrl}/sentiment/analyze`, { text: finalDescription });
             aiPayload = aiResponse.data;
         } catch (error) {
             console.error("FinBERT Error:", error.message);
@@ -47,7 +48,7 @@ exports.createTicket = async (req, res) => {
         let aiSummary = [];
         try {
             const chatResponse = await axios.post(`${mlServiceUrl}/chatbot/ask`, { 
-                question: `Summarize this investor complaint into exactly 3 short bullet points. Provide the output ONLY as a JSON object with a single key "bullets" containing an array of exactly 3 strings. Example: {"bullets": ["point 1", "point 2", "point 3"]}. Do not include any other text. Complaint: ${complaintText}`,
+                question: `Summarize this investor complaint into exactly 3 short bullet points. Provide the output ONLY as a JSON object with a single key "bullets" containing an array of exactly 3 strings. Example: {"bullets": ["point 1", "point 2", "point 3"]}. Do not include any other text. Complaint: ${finalDescription}`,
                 format: 'json'
             });
             const rawResponse = chatResponse.data.response;
@@ -122,22 +123,33 @@ exports.createTicket = async (req, res) => {
             }
         }
 
+        const deadline = new Date();
+        deadline.setDate(deadline.getDate() + 7); // Default SLA
+
         // 4. Create Ticket Document
         const newTicket = new Ticket({
             investorId,
             investorName,
             accountNumber,
-            documentName,
-            documentUrl,
-            complaintText,
+            title: title || 'Service Request',
+            description: finalDescription,
+            documents: documentUrl ? [{
+                name: documentName,
+                fileType: file.mimetype,
+                size: file.size,
+                s3Key: documentUrl,
+                ocrExtraction: {
+                    extractedText: ocrExtractedText,
+                    matchVerified: ocrMatchVerified
+                }
+            }] : [],
             aiSentimentScore: aiPayload.score || 0,
             assignedPriority: aiPayload.priority || 'NORMAL',
             aiSummary,
-            ocrExtractedText,
-            ocrMatchVerified,
             isPotentialFraud: aiPayload.fraud_alert || false,
             serviceType: serviceType || 'COMPLAINT',
             serviceMetadata: serviceMetadata || {},
+            slaTimeline: { slaDays: 7, deadline },
             status: 'OPEN'
         });
 
@@ -171,5 +183,45 @@ exports.createTicket = async (req, res) => {
         session.endSession();
         console.error("Transaction aborted. Error:", error);
         return res.status(500).json({ message: "Failed to create ticket.", error: error.message });
+    }
+};
+
+exports.getTickets = async (req, res) => {
+    try {
+        const query = {};
+        if (req.user && req.user.role === 'INVESTOR') {
+            query.investorId = req.user.id;
+        }
+        
+        // Optional filters
+        if (req.query.status) query.status = req.query.status;
+
+        const tickets = await Ticket.find(query).sort({ createdAt: -1 });
+        return res.status(200).json({ tickets });
+    } catch (error) {
+        console.error("[Ticket] getTickets error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+exports.getTicketById = async (req, res) => {
+    try {
+        const ticket = await Ticket.findById(req.params.id);
+        if (!ticket) {
+            return res.status(404).json({ message: "Ticket not found" });
+        }
+        
+        // Authorization: Investor can only see their own tickets
+        if (req.user && req.user.role === 'INVESTOR' && ticket.investorId.toString() !== req.user.id) {
+            return res.status(403).json({ message: "Unauthorized access to this ticket" });
+        }
+
+        // Fetch audit logs (timeline)
+        const timeline = await AuditLog.find({ entityId: ticket._id }).sort({ timestamp: 1 });
+
+        return res.status(200).json({ ticket, timeline });
+    } catch (error) {
+        console.error("[Ticket] getTicketById error:", error);
+        return res.status(500).json({ message: "Internal server error" });
     }
 };

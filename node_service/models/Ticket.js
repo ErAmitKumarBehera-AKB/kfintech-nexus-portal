@@ -6,7 +6,11 @@ const TicketSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
-    complaintText: {
+    title: {
+        type: String,
+        required: true
+    },
+    description: {
         type: String,
         required: true
     },
@@ -18,14 +22,17 @@ const TicketSchema = new mongoose.Schema({
         type: String,
         default: 'Not Provided'
     },
-    documentName: {
-        type: String,
-        default: null
-    },
-    documentUrl: {
-        type: String,
-        default: null
-    },
+    documents: [{
+        name: String,
+        fileType: String,
+        size: Number,
+        s3Key: String,
+        uploadedAt: { type: Date, default: Date.now },
+        ocrExtraction: {
+            extractedText: String,
+            matchVerified: Boolean
+        }
+    }],
     aiSentimentScore: {
         type: Number,
         default: 0
@@ -39,14 +46,7 @@ const TicketSchema = new mongoose.Schema({
         type: [String],
         default: []
     },
-    ocrExtractedText: {
-        type: String,
-        default: null
-    },
-    ocrMatchVerified: {
-        type: Boolean,
-        default: false
-    },
+
     isPotentialFraud: {
         type: Boolean,
         default: false
@@ -63,6 +63,10 @@ const TicketSchema = new mongoose.Schema({
     l2ReturnNote: {
         type: String,
         default: null
+    },
+    slaTimeline: {
+        slaDays: { type: Number, default: 7 },
+        deadline: { type: Date }
     },
     status: {
         type: String,
