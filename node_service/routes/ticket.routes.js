@@ -6,7 +6,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 
 // Route: POST /api/tickets
 // Only authenticated Investors (and Admins) can lodge tickets
-router.post('/', authenticate, authorize('INVESTOR', 'ADMIN_SUPER'), upload.single('file'), ticketController.createTicket);
+router.post('/', authenticate, authorize('INVESTOR', 'ADMIN_SUPER'), upload.array('documents', 5), ticketController.createTicket);
 
 // Route: GET /api/tickets
 // Get tickets for logged-in user
@@ -20,6 +20,6 @@ router.get('/:id', authenticate, ticketController.getTicketById);
 router.post('/:id/comments', authenticate, ticketController.addComment);
 
 // POST /api/tickets/:id/resubmit
-router.post('/:id/resubmit', authenticate, upload.single('document'), ticketController.resubmitTicket);
+router.post('/:id/resubmit', authenticate, upload.array('documents', 5), ticketController.resubmitTicket);
 
 module.exports = router;

@@ -85,6 +85,12 @@ const L2CheckerDesk = () => {
     const [expandedId, setExpandedId] = useState(null);
     const [pendingReturn, setPendingReturn] = useState({ id: null, note: '' });
 
+    // Filtering State
+    const [filterServiceType, setFilterServiceType] = useState('ALL');
+    const [filterSearch, setFilterSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+
     const toggleExpanded = (id) => setExpandedId(prev => prev === id ? null : id);
 
     const handleReturnToL1 = (ticketId) => {
@@ -93,20 +99,17 @@ const L2CheckerDesk = () => {
 
     useEffect(() => {
         const fetchL2Queue = async () => {
+            setLoading(true);
             try {
-                const response = await apiClient.get('/dashboard/l2-queue');
-                let fetchedTickets = response.data.data || [];
-                
-                // Sort by Priority (CRITICAL > HIGH > NORMAL) and then by Oldest First
-                const priorityWeight = { 'CRITICAL': 3, 'HIGH': 2, 'NORMAL': 1 };
-                fetchedTickets.sort((a, b) => {
-                    const weightA = priorityWeight[a.assignedPriority || 'NORMAL'] || 1;
-                    const weightB = priorityWeight[b.assignedPriority || 'NORMAL'] || 1;
-                    if (weightA !== weightB) return weightB - weightA;
-                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                const response = await apiClient.get('/l2/tickets', {
+                    params: {
+                        serviceType: filterServiceType,
+                        search: filterSearch,
+                        page
+                    }
                 });
-                
-                setTickets(fetchedTickets);
+                setTickets(response.data.tickets || []);
+                setTotalPages(response.data.pagination?.pages || 1);
                 setError(null);
             } catch (err) {
                 console.error("Error fetching L2 queue:", err);
@@ -117,7 +120,7 @@ const L2CheckerDesk = () => {
         };
 
         fetchL2Queue();
-    }, []);
+    }, [filterServiceType, filterSearch, page]);
 
     const handleAction = async (ticketId, action, notes = '') => {
         try {
@@ -162,8 +165,28 @@ const L2CheckerDesk = () => {
                     </h1>
                     <p className="text-gray-400 mt-2 text-lg font-medium">Finalize pre-verified tickets. AI context is generated for rapid decision making.</p>
                 </div>
-                <div className="text-sm font-bold text-gray-400 uppercase tracking-widest bg-kfintech-card/50 px-5 py-2 rounded-lg border border-kfintech-border shadow-inner">
-                    Total Queue: <span className="text-white font-mono text-lg ml-2">{tickets.length}</span>
+                <div className="flex flex-col items-end gap-2">
+                    <div className="flex items-center gap-2">
+                        <input 
+                            type="text" placeholder="Search..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
+                            className="bg-kfintech-bg border border-kfintech-border rounded px-3 py-1.5 text-xs text-white"
+                        />
+                        <select value={filterServiceType} onChange={e => setFilterServiceType(e.target.value)} className="bg-kfintech-bg border border-kfintech-border rounded px-2 py-1.5 text-xs text-white">
+                            <option value="ALL">All Service Types</option>
+                            <option value="BANK_UPDATE">Bank Update</option>
+                            <option value="KYC_UPDATE">KYC Update</option>
+                            <option value="NOMINEE_UPDATE">Nominee Update</option>
+                            <option value="ADDRESS_UPDATE">Address Update</option>
+                            <option value="COMPLAINT">Complaint</option>
+                        </select>
+                    </div>
+                    {totalPages > 1 && (
+                        <div className="flex gap-2 items-center bg-kfintech-card/50 px-3 py-1 rounded-lg border border-kfintech-border shadow-inner">
+                            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="text-[10px] text-gray-400 disabled:opacity-30">PREV</button>
+                            <span className="text-[10px] text-white font-bold">{page} / {totalPages}</span>
+                            <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} className="text-[10px] text-gray-400 disabled:opacity-30">NEXT</button>
+                        </div>
+                    )}
                 </div>
             </motion.header>
 
@@ -296,48 +319,43 @@ const L2CheckerDesk = () => {
                                                     </div>
                                                 </div>
 
-                                                {/* Document */}
-                                                <div className={`p-4 rounded-xl border border-kfintech-border/50 bg-kfintech-card/30 flex items-start gap-4 transition-colors ${
-                                                    ticket.documents?.[0]?.name ? 'hover:bg-kfintech-card/50 hover:border-kfintech-border' : 'opacity-50 grayscale'
-                                                }`}>
-                                                    <div className={`p-3 rounded-lg shadow-inner ${
-                                                        ticket.documents?.[0]?.name ? 'bg-kfintech-bg text-kfintech-primary' : 'bg-kfintech-bg/50 text-gray-600'
-                                                    }`}>
-                                                        <FileText className="w-6 h-6" />
+                                                {/* Documents */}
+                                                {ticket.documents && ticket.documents.length > 0 ? (
+                                                    <div className="space-y-3">
+                                                        {ticket.documents.map((doc, idx) => (
+                                                            <div key={idx} className={`p-4 rounded-xl border border-kfintech-border/50 bg-kfintech-card/30 flex items-start gap-4 transition-colors hover:bg-kfintech-card/50 hover:border-kfintech-border`}>
+                                                                <div className={`p-3 rounded-lg shadow-inner ${doc.status === 'VERIFIED' ? 'bg-kfintech-bg text-emerald-400' : 'bg-kfintech-bg/50 text-gray-600'}`}>
+                                                                    {doc.status === 'VERIFIED' ? <CheckCircle className="w-6 h-6" /> : <FileText className="w-6 h-6" />}
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <div className="flex justify-between items-start">
+                                                                        <p className="font-bold text-sm text-blue-300">{doc.name}</p>
+                                                                        <span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${doc.status === 'VERIFIED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-500/20 text-gray-400'}`}>{doc.status}</span>
+                                                                    </div>
+                                                                    
+                                                                    {doc.s3Key && (
+                                                                        <button 
+                                                                            className="mt-2 text-xs font-bold uppercase tracking-wider text-kfintech-primary hover:text-blue-300 flex items-center gap-1 transition-colors"
+                                                                            onClick={() => window.open(doc.s3Key, '_blank')}
+                                                                        >
+                                                                            <Activity className="w-3 h-3" /> View Source Document
+                                                                        </button>
+                                                                    )}
+                                                                    
+                                                                    {doc.ocrExtraction && doc.ocrExtraction.matchVerified !== undefined && (
+                                                                        <div className="mt-3 p-3 bg-kfintech-bg/50 rounded-lg border border-kfintech-border/50">
+                                                                            <p className={`font-bold text-xs flex items-center gap-1 ${doc.ocrExtraction.matchVerified ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                                                {doc.ocrExtraction.matchVerified ? <><ShieldCheck className="w-3 h-3" /> OCR Verified Match</> : <><AlertTriangle className="w-3 h-3" /> OCR Match Failed</>}
+                                                                            </p>
+                                                                            <p className="text-[10px] text-gray-500 mt-0.5">Cross-checked via automated pipeline</p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
                                                     </div>
-                                                    <div className="flex-1">
-                                                        <p className={`font-bold text-sm ${
-                                                            ticket.documents?.[0]?.name ? 'text-blue-300' : 'text-gray-600'
-                                                        }`}>
-                                                            {ticket.documents?.[0]?.name || 'No document attached'}
-                                                        </p>
-                                                        {ticket.documents?.[0]?.s3Key && (
-                                                            <button 
-                                                                className="mt-2 text-xs font-bold uppercase tracking-wider text-kfintech-primary hover:text-blue-300 flex items-center gap-1 transition-colors"
-                                                                onClick={() => window.open(ticket.documents[0].s3Key, '_blank')}
-                                                            >
-                                                                <Activity className="w-3 h-3" /> View Source Document
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {ticket.documents?.[0]?.ocrExtraction && ticket.documents[0].ocrExtraction.matchVerified !== undefined && (
-                                                    <div className={`p-4 rounded-xl border border-kfintech-border/50 bg-kfintech-card/30 flex items-start gap-4 transition-colors hover:bg-kfintech-card/50 hover:border-kfintech-border`}>
-                                                        <div className={`p-3 rounded-lg shadow-inner ${
-                                                            ticket.documents[0].ocrExtraction.matchVerified ? 'bg-kfintech-bg text-emerald-400' : 'bg-kfintech-bg/50 text-red-400'
-                                                        }`}>
-                                                            <ShieldCheck className="w-6 h-6" />
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <p className={`font-bold text-sm ${
-                                                                ticket.documents[0].ocrExtraction.matchVerified ? 'text-emerald-400' : 'text-red-400'
-                                                            }`}>
-                                                                {ticket.documents[0].ocrExtraction.matchVerified ? 'OCR Verified' : 'OCR Failed'}
-                                                            </p>
-                                                            <p className="text-xs text-gray-500 mt-1">Cross-checked via automated pipeline</p>
-                                                        </div>
-                                                    </div>
+                                                ) : (
+                                                    <div className="text-sm text-gray-500 italic p-4 text-center">No documents attached</div>
                                                 )}
                                             </div>
                                         </motion.div>

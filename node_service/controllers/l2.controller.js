@@ -5,6 +5,48 @@ const AuditLog = require('../models/AuditLog');
 const { sendEmail } = require('../services/sesService');
 const { sendSMS } = require('../services/snsService');
 
+exports.getL2Queue = async (req, res) => {
+    try {
+        const { search, page = 1, limit = 20, serviceType } = req.query;
+        
+        const query = { status: 'L2_APPROVAL' };
+
+        if (serviceType && serviceType !== 'ALL') {
+            query.serviceType = serviceType;
+        }
+
+        if (search) {
+            query.$or = [
+                { title: { $regex: search, $options: 'i' } },
+                { investorName: { $regex: search, $options: 'i' } }
+            ];
+            if (mongoose.Types.ObjectId.isValid(search)) {
+                query.$or.push({ _id: search });
+            }
+        }
+
+        const tickets = await Ticket.find(query)
+            .sort({ createdAt: 1 })
+            .skip((page - 1) * limit)
+            .limit(parseInt(limit))
+            .populate('investorId', 'name email bankAccount kyc nominee address');
+
+        const total = await Ticket.countDocuments(query);
+
+        res.status(200).json({
+            tickets,
+            pagination: {
+                total,
+                page: parseInt(page),
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching L2 queue:", error);
+        res.status(500).json({ message: "Failed to fetch L2 queue" });
+    }
+};
+
 exports.finalizeTicket = async (req, res) => {
     const { ticketId, action, notes } = req.body;
     

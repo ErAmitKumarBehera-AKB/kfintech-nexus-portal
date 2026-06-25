@@ -31,25 +31,32 @@ const L1MakerDesk = () => {
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [loading, setLoading] = useState(true);
     const [notes, setNotes] = useState('');
-    const [isOcrRunning, setIsOcrRunning] = useState(false);
-    const [ocrResult, setOcrResult] = useState(null);
+    
+    // Filtering State
+    const [filterStatus, setFilterStatus] = useState('ALL');
+    const [filterPriority, setFilterPriority] = useState('ALL');
+    const [filterAssigned, setFilterAssigned] = useState('ALL');
+    const [filterAge, setFilterAge] = useState('NEWEST');
+    const [filterSearch, setFilterSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
 
     useEffect(() => {
         const fetchQueue = async () => {
+            setLoading(true);
             try {
-                const response = await apiClient.get('/dashboard/l1-queue');
-                let fetchedTickets = response.data.data || [];
-                
-                // Sort by Priority (CRITICAL > HIGH > NORMAL) and then by Oldest First 
-                const priorityWeight = { 'CRITICAL': 3, 'HIGH': 2, 'NORMAL': 1 };
-                fetchedTickets.sort((a, b) => {
-                    const weightA = priorityWeight[a.assignedPriority || 'NORMAL'] || 1;
-                    const weightB = priorityWeight[b.assignedPriority || 'NORMAL'] || 1;
-                    if (weightA !== weightB) return weightB - weightA; // Higher weight first
-                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); // Oldest first
+                const response = await apiClient.get('/l1/tickets', {
+                    params: {
+                        status: filterStatus,
+                        priority: filterPriority,
+                        assigned: filterAssigned,
+                        age: filterAge,
+                        search: filterSearch,
+                        page
+                    }
                 });
-                
-                setQueue(fetchedTickets);
+                setQueue(response.data.tickets || []);
+                setTotalPages(response.data.pagination?.pages || 1);
             } catch (error) {
                 console.error("Queue Fetch Error:", error);
             } finally {
@@ -57,7 +64,7 @@ const L1MakerDesk = () => {
             }
         };
         fetchQueue();
-    }, []);
+    }, [filterStatus, filterPriority, filterAssigned, filterAge, filterSearch, page]);
 
     const calculateSLA = (dateString, priority) => {
         if (!dateString) return <span className="text-gray-400">N/A</span>;
@@ -85,42 +92,52 @@ const L1MakerDesk = () => {
         return <span className="text-emerald-400">{hours}h {mins}m remaining</span>;
     };
 
-    const handleRunOCR = () => {
-        setIsOcrRunning(true);
-        setOcrResult(null);
-        setTimeout(() => {
-            setIsOcrRunning(false);
-            setOcrResult({
-                matched: true,
-                extracted: "FOLIO: 123456789\nNAME: JOHN DOE\nSTATUS: ACTIVE"
-            });
-        }, 2000);
+    const handleVerifyDoc = async (docId, currentStatus) => {
+        try {
+            const newStatus = currentStatus === 'VERIFIED' ? false : true;
+            const res = await apiClient.post(`/l1/tickets/${selectedTicket._id}/verify-document/${docId}`, { verified: newStatus });
+            setSelectedTicket(prev => ({ ...prev, documents: res.data.documents }));
+        } catch (error) {
+            alert(`Verification failed: ${error.response?.data?.message || error.message}`);
+        }
     };
 
     const handleEscalate = async () => {
         if (!selectedTicket) return;
         try {
-            await apiClient.put(`/admin/escalate/${selectedTicket._id}`, { notes });
+            await apiClient.post(`/l1/tickets/${selectedTicket._id}/escalate`, { notes });
             setQueue(q => q.filter(t => t._id !== selectedTicket._id));
             setSelectedTicket(null);
             setNotes('');
-            setOcrResult(null);
         } catch (error) {
-            alert(`Escalation failed: ${error.response?.data?.error || error.message}`);
+            alert(`Escalation failed: ${error.response?.data?.message || error.message}`);
         }
     };
 
     const handleReject = async () => {
         if (!selectedTicket) return;
+        if (!notes) { alert("Please provide notes/reason for rejection"); return; }
         if (!window.confirm('Reject this request? This action will permanently close the ticket.')) return;
         try {
-            await apiClient.put(`/admin/reject/${selectedTicket._id}`, { notes });
+            await apiClient.post(`/l1/tickets/${selectedTicket._id}/reject`, { reason: notes });
             setQueue(q => q.filter(t => t._id !== selectedTicket._id));
             setSelectedTicket(null);
             setNotes('');
-            setOcrResult(null);
         } catch (error) {
-            alert(`Rejection failed: ${error.response?.data?.error || error.message}`);
+            alert(`Rejection failed: ${error.response?.data?.message || error.message}`);
+        }
+    };
+
+    const handleHold = async () => {
+        if (!selectedTicket) return;
+        if (!notes) { alert("Please provide a reason to hold this ticket."); return; }
+        try {
+            await apiClient.post(`/l1/tickets/${selectedTicket._id}/hold`, { reason: notes });
+            setQueue(q => q.filter(t => t._id !== selectedTicket._id));
+            setSelectedTicket(null);
+            setNotes('');
+        } catch (error) {
+            alert(`Hold failed: ${error.response?.data?.message || error.message}`);
         }
     };
 
@@ -169,6 +186,37 @@ const L1MakerDesk = () => {
                             </div>
                         </div>
                     )}
+                    {/* Filters Section */}
+                    <div className="mt-4 flex flex-col gap-2">
+                        <input 
+                            type="text" placeholder="Search..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
+                            className="bg-kfintech-bg border border-kfintech-border rounded px-3 py-1.5 text-xs text-white"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="bg-kfintech-bg border border-kfintech-border rounded px-2 py-1 text-[10px] text-white">
+                                <option value="ALL">All Status</option>
+                                <option value="OPEN">Open</option>
+                                <option value="IN_PROGRESS">In Progress</option>
+                                <option value="L1_REVIEW">L1 Review</option>
+                                <option value="ON_HOLD">On Hold</option>
+                            </select>
+                            <select value={filterAssigned} onChange={e => setFilterAssigned(e.target.value)} className="bg-kfintech-bg border border-kfintech-border rounded px-2 py-1 text-[10px] text-white">
+                                <option value="ALL">All Assigned</option>
+                                <option value="ME">Assigned to Me</option>
+                                <option value="UNASSIGNED">Unassigned</option>
+                            </select>
+                            <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="bg-kfintech-bg border border-kfintech-border rounded px-2 py-1 text-[10px] text-white">
+                                <option value="ALL">All Priorities</option>
+                                <option value="CRITICAL">Critical</option>
+                                <option value="HIGH">High</option>
+                                <option value="NORMAL">Normal</option>
+                            </select>
+                            <select value={filterAge} onChange={e => setFilterAge(e.target.value)} className="bg-kfintech-bg border border-kfintech-border rounded px-2 py-1 text-[10px] text-white">
+                                <option value="NEWEST">Newest First</option>
+                                <option value="OLDEST">Oldest First</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 
                 <div className="overflow-y-auto flex-grow p-4 space-y-3 custom-scrollbar">
@@ -220,6 +268,14 @@ const L1MakerDesk = () => {
                             ))
                         )}
                     </AnimatePresence>
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="flex justify-between items-center px-4 py-2 bg-kfintech-card rounded-xl border border-kfintech-border mt-2">
+                            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="text-[10px] text-gray-400 disabled:opacity-30">PREV</button>
+                            <span className="text-[10px] text-white font-bold">{page} / {totalPages}</span>
+                            <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} className="text-[10px] text-gray-400 disabled:opacity-30">NEXT</button>
+                        </div>
+                    )}
                 </div>
             </aside>
 
@@ -312,83 +368,67 @@ const L1MakerDesk = () => {
                                 </div>
                             </div>
 
-                            <div className="glass-panel p-6 rounded-2xl mb-6 shadow-lg border border-kfintech-border">
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                    <Cpu className="w-4 h-4" /> Secure Document Inspector
-                                </h4>
-                                <div className="flex gap-6">
-                                    
-                                    <div className="w-1/2 bg-kfintech-bg/50 rounded-xl border border-kfintech-border flex flex-col items-center justify-center p-8 relative overflow-hidden min-h-[300px] shadow-inner group">
-                                        <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none transform -rotate-45">
-                                            <span className="text-4xl font-black tracking-widest text-white">CONFIDENTIAL</span>
-                                        </div>
-                                        <div className="text-center relative z-10 group-hover:scale-105 transition-transform mb-4">
-                                            <FileText className="w-16 h-16 text-gray-500 mx-auto mb-3" />
-                                            <p className="text-sm font-bold text-blue-300">{selectedTicket.documents?.[0]?.name || "No document attached"}</p>
-                                            <p className="text-xs text-gray-500 mt-1">{selectedTicket.documents?.[0] ? "AES-256 Encrypted" : "OCR disabled"}</p>
-                                        </div>
-                                        {selectedTicket.documents?.[0]?.s3Key && (
-                                            <button 
-                                                className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/50 rounded flex items-center gap-2 text-xs font-bold uppercase transition-colors"
-                                                onClick={() => window.open(selectedTicket.documents[0].s3Key, '_blank')}
-                                            >
-                                                View Document <ChevronRight className="w-3 h-3" />
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    <div className="w-1/2 flex flex-col">
-                                        <div className="bg-kfintech-primary/5 p-6 rounded-xl border border-kfintech-primary/20 flex-grow shadow-inner">
-                                            <h5 className="font-extrabold text-blue-400 mb-3 flex items-center gap-2 text-lg">
-                                                <Cpu className="w-5 h-5" /> EasyOCR Engine
-                                            </h5>
-                                            <p className="text-sm text-gray-400 mb-6 font-medium leading-relaxed">
-                                                Run Zero-Touch automated text extraction to verify the embedded account details against the CRM records.
-                                            </p>
+                            {/* Multiple Documents Rendering */}
+                            {selectedTicket.documents && selectedTicket.documents.length > 0 ? (
+                                <div className="space-y-6 mb-6">
+                                    {selectedTicket.documents.map((doc, idx) => (
+                                        <div key={doc._id || idx} className="glass-panel p-6 rounded-2xl shadow-lg border border-kfintech-border">
+                                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex justify-between items-center">
+                                                <span className="flex items-center gap-2"><Cpu className="w-4 h-4" /> Document {idx + 1}: {doc.name}</span>
+                                                <button onClick={() => handleVerifyDoc(doc._id, doc.status)} className={`px-4 py-1.5 rounded text-xs font-bold uppercase transition-colors flex items-center gap-2 ${doc.status === 'VERIFIED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600'}`}>
+                                                    {doc.status === 'VERIFIED' ? <><CheckCircle2 className="w-4 h-4"/> Verified</> : 'Mark as Verified'}
+                                                </button>
+                                            </h4>
                                             
-                                            <motion.button 
-                                                whileHover={{ scale: 1.02 }}
-                                                whileTap={{ scale: 0.98 }}
-                                                onClick={() => {
-                                                    setIsOcrRunning(true);
-                                                    setTimeout(() => {
-                                                        setIsOcrRunning(false);
-                                                        setOcrResult({
-                                                            matched: selectedTicket.documents?.[0]?.ocrExtraction?.matchVerified || false,
-                                                            extracted: selectedTicket.documents?.[0]?.ocrExtraction?.extractedText || "No document attached or OCR processing failed."
-                                                        });
-                                                    }, 800);
-                                                }}
-                                                disabled={isOcrRunning}
-                                                className={`w-full py-4 rounded-xl text-sm font-bold uppercase tracking-wider text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
-                                                    isOcrRunning ? 'bg-kfintech-border cursor-wait text-gray-400' : 'bg-kfintech-primary hover:bg-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.6)]'
-                                                }`}
-                                            >
-                                                {isOcrRunning ? (
-                                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Analyzing...</>
-                                                ) : 'Run AI Extraction'}
-                                            </motion.button>
+                                            <div className="flex gap-6">
+                                                <div className="w-1/2 bg-kfintech-bg/50 rounded-xl border border-kfintech-border flex flex-col items-center justify-center p-8 relative overflow-hidden min-h-[300px] shadow-inner group">
+                                                    <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none transform -rotate-45">
+                                                        <span className="text-4xl font-black tracking-widest text-white">CONFIDENTIAL</span>
+                                                    </div>
+                                                    <div className="text-center relative z-10 group-hover:scale-105 transition-transform mb-4">
+                                                        <FileText className="w-16 h-16 text-gray-500 mx-auto mb-3" />
+                                                        <p className="text-sm font-bold text-blue-300">{doc.name}</p>
+                                                        <p className="text-xs text-gray-500 mt-1">AES-256 Encrypted</p>
+                                                    </div>
+                                                    {doc.s3Key && (
+                                                        <button 
+                                                            className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/50 rounded flex items-center gap-2 text-xs font-bold uppercase transition-colors"
+                                                            onClick={() => window.open(doc.s3Key, '_blank')}
+                                                        >
+                                                            View Document <ChevronRight className="w-3 h-3" />
+                                                        </button>
+                                                    )}
+                                                </div>
 
-                                            <AnimatePresence>
-                                                {ocrResult && (
-                                                    <motion.div 
-                                                        initial={{ opacity: 0, y: 10 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        className={`mt-6 p-5 rounded-xl border shadow-inner ${ocrResult.matched ? 'bg-kfintech-accent/10 border-kfintech-accent/30' : 'bg-red-500/10 border-red-500/30'}`}
-                                                    >
-                                                        <div className={`flex items-center gap-2 font-bold mb-3 text-sm uppercase tracking-wider ${ocrResult.matched ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                            {ocrResult.matched ? <><CheckCircle2 className="w-5 h-5" /> CRM Match Verified</> : <><ShieldAlert className="w-5 h-5" /> Verification Failed</>}
-                                                        </div>
-                                                        <pre className="text-xs bg-kfintech-bg/80 p-3 rounded-lg text-gray-300 font-mono border border-kfintech-border shadow-inner leading-relaxed whitespace-pre-wrap">
-                                                            {ocrResult.extracted}
-                                                        </pre>
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
+                                                <div className="w-1/2 flex flex-col">
+                                                    <div className="bg-kfintech-primary/5 p-6 rounded-xl border border-kfintech-primary/20 flex-grow shadow-inner">
+                                                        <h5 className="font-extrabold text-blue-400 mb-3 flex items-center gap-2 text-lg">
+                                                            <Cpu className="w-5 h-5" /> AI Extraction Result
+                                                        </h5>
+                                                        
+                                                        {doc.ocrExtraction ? (
+                                                            <div className={`mt-2 p-5 rounded-xl border shadow-inner ${doc.ocrExtraction.matchVerified ? 'bg-kfintech-accent/10 border-kfintech-accent/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                                                                <div className={`flex items-center gap-2 font-bold mb-3 text-sm uppercase tracking-wider ${doc.ocrExtraction.matchVerified ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                                    {doc.ocrExtraction.matchVerified ? <><CheckCircle2 className="w-5 h-5" /> CRM Match Verified</> : <><ShieldAlert className="w-5 h-5" /> Verification Failed</>}
+                                                                </div>
+                                                                <pre className="text-xs bg-kfintech-bg/80 p-3 rounded-lg text-gray-300 font-mono border border-kfintech-border shadow-inner leading-relaxed whitespace-pre-wrap max-h-[150px] overflow-y-auto custom-scrollbar">
+                                                                    {doc.ocrExtraction.extractedText || "No text extracted."}
+                                                                </pre>
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-sm text-gray-400 font-medium">No OCR data available for this document.</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
+                                    ))}
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="glass-panel p-6 rounded-2xl mb-6 shadow-lg border border-kfintech-border text-center text-gray-500 font-medium">
+                                    No documents attached to this ticket.
+                                </div>
+                            )}
                         </div>
 
                         {/* Sticky Action Footer */}
@@ -401,6 +441,14 @@ const L1MakerDesk = () => {
                                 className="w-full bg-kfintech-bg border border-kfintech-border rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-kfintech-primary/50 focus:border-kfintech-primary outline-none transition-colors shadow-inner resize-none"
                             />
                             <div className="flex justify-end gap-3">
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={handleHold}
+                                    className="flex items-center gap-2 px-6 py-3 border border-orange-500/40 text-orange-400 bg-orange-500/5 rounded-xl hover:bg-orange-500/15 font-bold transition-all text-sm uppercase tracking-wider"
+                                >
+                                    <AlertTriangle className="w-4 h-4" /> Hold Ticket
+                                </motion.button>
                                 <motion.button
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}

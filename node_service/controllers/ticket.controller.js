@@ -22,7 +22,7 @@ exports.createTicket = async (req, res) => {
             serviceMetadata = {};
         }
     }
-    const file = req.file;
+    const files = req.files || [];
 
     const investorId = req.user ? req.user.id : new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a00'); 
 
@@ -41,7 +41,7 @@ exports.createTicket = async (req, res) => {
     }
 
     // Check required documents
-    if (serviceConfig.requiredDocuments.length > 0 && !file) {
+    if (serviceConfig.requiredDocuments.length > 0 && files.length === 0) {
         return res.status(400).json({ message: `Missing required document for ${serviceConfig.label}: ${serviceConfig.requiredDocuments[0]}` });
     }
 
@@ -93,36 +93,22 @@ exports.createTicket = async (req, res) => {
             aiSummary = ["Ollama AI Engine not reachable.", "Using default static insights.", "Sentiment flags potential churn."];
         }
 
-        // --- C. EasyOCR Extraction ---
-        let ocrExtractedText = null;
-        let ocrMatchVerified = false;
-        if (file) {
-            try {
-                const formData = new FormData();
-                formData.append('account_number', accountNumber);
-                formData.append('file', file.buffer, {
-                    filename: file.originalname,
-                    contentType: file.mimetype,
-                });
-                
-                const ocrRes = await axios.post(`${mlServiceUrl}/ocr/verify-account`, formData, {
-                    headers: { ...formData.getHeaders() }
-                });
-                
-                ocrExtractedText = ocrRes.data.extracted_text.join('\n');
-                ocrMatchVerified = ocrRes.data.account_found;
-            } catch (error) {
-                console.error("EasyOCR Error:", error.message);
-                ocrExtractedText = "OCR Processing Failed: " + error.message;
+        // --- C & D. Multi-Document S3 Upload & OCR ---
+        const uploadedDocuments = [];
+        
+        for (const file of files) {
+            // Validate file type
+            const isPdf = file.mimetype === 'application/pdf';
+            const isImage = file.mimetype.startsWith('image/');
+            
+            if (!isPdf && !isImage) {
+                // Reject invalid file type
+                throw new Error("Invalid file type. Only PDF and images (PNG/JPG) are allowed.");
             }
-        }
 
-        // --- D. S3 Document Upload ---
-        let documentUrl = null;
-        let documentName = null;
-        if (file) {
-            documentName = file.originalname;
+            // D. S3 Document Upload
             const fileName = `${uuidv4()}-${file.originalname}`;
+            let documentUrl = null;
             try {
                 await uploadToS3({
                     Key: fileName,
@@ -130,13 +116,50 @@ exports.createTicket = async (req, res) => {
                     ContentType: file.mimetype,
                 });
                 
-                // Construct S3 path-style URL for LocalStack
                 const endpoint = process.env.AWS_ENDPOINT_URL || 'http://localhost:4566';
                 const bucket = process.env.AWS_BUCKET_NAME || 'kfintech-bucket';
                 documentUrl = `${endpoint}/${bucket}/${encodeURIComponent(fileName)}`;
             } catch (error) {
                 console.error("LocalStack S3 Upload Error:", error.message);
+                throw new Error("Failed to upload document to secure storage.");
             }
+
+            // C. EasyOCR Extraction (Images only)
+            let ocrExtractedText = isPdf ? "OCR skipped for PDF. Manual review required." : null;
+            let ocrMatchVerified = false;
+            
+            if (isImage) {
+                try {
+                    const formData = new FormData();
+                    formData.append('account_number', accountNumber);
+                    formData.append('file', file.buffer, {
+                        filename: file.originalname,
+                        contentType: file.mimetype,
+                    });
+                    
+                    const ocrRes = await axios.post(`${mlServiceUrl}/ocr/verify-account`, formData, {
+                        headers: { ...formData.getHeaders() }
+                    });
+                    
+                    ocrExtractedText = ocrRes.data.extracted_text.join('\n');
+                    ocrMatchVerified = ocrRes.data.account_found;
+                } catch (error) {
+                    console.error("EasyOCR Error:", error.message);
+                    ocrExtractedText = "OCR Processing Failed: " + error.message;
+                }
+            }
+
+            uploadedDocuments.push({
+                name: file.originalname,
+                fileType: file.mimetype,
+                size: file.size,
+                s3Key: documentUrl,
+                status: 'PENDING',
+                ocrExtraction: {
+                    extractedText: ocrExtractedText,
+                    matchVerified: ocrMatchVerified
+                }
+            });
         }
         // 4. Create Ticket Document with dynamic SLA
         const slaConfig = buildSlaTimeline(serviceType);
@@ -147,16 +170,7 @@ exports.createTicket = async (req, res) => {
             accountNumber,
             title: title || 'Service Request',
             description: finalDescription,
-            documents: documentUrl ? [{
-                name: documentName,
-                fileType: file.mimetype,
-                size: file.size,
-                s3Key: documentUrl,
-                ocrExtraction: {
-                    extractedText: ocrExtractedText,
-                    matchVerified: ocrMatchVerified
-                }
-            }] : [],
+            documents: uploadedDocuments,
             aiSentimentScore: aiPayload.score || 0,
             assignedPriority: aiPayload.priority || 'NORMAL',
             aiSummary,
@@ -312,7 +326,7 @@ exports.addComment = async (req, res) => {
 exports.resubmitTicket = async (req, res) => {
     try {
         const ticketId = req.params.id;
-        const file = req.file;
+        const files = req.files || [];
 
         const ticket = await Ticket.findById(ticketId);
         if (!ticket) return res.status(404).json({ message: "Ticket not found." });
@@ -325,33 +339,72 @@ exports.resubmitTicket = async (req, res) => {
             return res.status(400).json({ message: "Only REJECTED tickets can be resubmitted." });
         }
 
-        if (!file) {
+        if (files.length === 0) {
             return res.status(400).json({ message: "New document is required for resubmission." });
         }
 
-        let documentUrl = null;
-        let documentName = file.originalname;
-        const fileName = `${uuidv4()}-${file.originalname}`;
-        try {
-            await uploadToS3({
-                Key: fileName,
-                Body: file.buffer,
-                ContentType: file.mimetype,
-            });
-            const endpoint = process.env.AWS_ENDPOINT_URL || 'http://localhost:4566';
-            const bucket = process.env.AWS_BUCKET_NAME || 'kfintech-bucket';
-            documentUrl = `${endpoint}/${bucket}/${encodeURIComponent(fileName)}`;
-        } catch (error) {
-            console.error("LocalStack S3 Upload Error:", error.message);
-        }
+        const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
 
-        ticket.documents.push({
-            name: documentName,
-            fileType: file.mimetype,
-            size: file.size,
-            s3Key: documentUrl,
-            status: 'PENDING'
-        });
+        for (const file of files) {
+            const isPdf = file.mimetype === 'application/pdf';
+            const isImage = file.mimetype.startsWith('image/');
+            
+            if (!isPdf && !isImage) {
+                throw new Error("Invalid file type. Only PDF and images (PNG/JPG) are allowed.");
+            }
+
+            let documentUrl = null;
+            const fileName = `${uuidv4()}-${file.originalname}`;
+            try {
+                await uploadToS3({
+                    Key: fileName,
+                    Body: file.buffer,
+                    ContentType: file.mimetype,
+                });
+                const endpoint = process.env.AWS_ENDPOINT_URL || 'http://localhost:4566';
+                const bucket = process.env.AWS_BUCKET_NAME || 'kfintech-bucket';
+                documentUrl = `${endpoint}/${bucket}/${encodeURIComponent(fileName)}`;
+            } catch (error) {
+                console.error("LocalStack S3 Upload Error:", error.message);
+                throw new Error("Failed to upload document to secure storage.");
+            }
+
+            let ocrExtractedText = isPdf ? "OCR skipped for PDF. Manual review required." : null;
+            let ocrMatchVerified = false;
+
+            if (isImage) {
+                try {
+                    const formData = new FormData();
+                    formData.append('account_number', ticket.accountNumber || "123456789");
+                    formData.append('file', file.buffer, {
+                        filename: file.originalname,
+                        contentType: file.mimetype,
+                    });
+                    
+                    const ocrRes = await axios.post(`${mlServiceUrl}/ocr/verify-account`, formData, {
+                        headers: { ...formData.getHeaders() }
+                    });
+                    
+                    ocrExtractedText = ocrRes.data.extracted_text.join('\n');
+                    ocrMatchVerified = ocrRes.data.account_found;
+                } catch (error) {
+                    console.error("EasyOCR Error:", error.message);
+                    ocrExtractedText = "OCR Processing Failed: " + error.message;
+                }
+            }
+
+            ticket.documents.push({
+                name: file.originalname,
+                fileType: file.mimetype,
+                size: file.size,
+                s3Key: documentUrl,
+                status: 'PENDING',
+                ocrExtraction: {
+                    extractedText: ocrExtractedText,
+                    matchVerified: ocrMatchVerified
+                }
+            });
+        }
 
         // Reset status
         ticket.status = 'OPEN';

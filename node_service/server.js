@@ -70,7 +70,6 @@ mongoose.connect(MONGODB_URI)
         process.exit(1);
     });
 
-// TODO: Import your route files here once created
 // Register all Mongoose models so .populate() works correctly
 require('./models/User');
 require('./models/Notification');
@@ -79,6 +78,7 @@ require('./models/Notification');
 const authRoutes = require('./routes/auth.routes');
 const ticketRoutes = require('./routes/ticket.routes');
 const adminRoutes = require('./routes/admin.routes');
+const l1Routes = require('./routes/l1.routes');
 const l2Routes = require('./routes/l2.routes');
 const chatRoutes = require('./routes/chat.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
@@ -87,6 +87,7 @@ const notificationRoutes = require('./routes/notification.routes');
 app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/l1', l1Routes);
 app.use('/api/l2', l2Routes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/dashboard', dashboardRoutes);
