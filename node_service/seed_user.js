@@ -13,7 +13,11 @@ try {
         passwordHash: String,
         phoneNumber: String,
         role: { type: String, enum: ['INVESTOR', 'ADMIN_L1', 'ADMIN_L2', 'ADMIN_SUPER'], default: 'INVESTOR' },
-        isActive: { type: Boolean, default: true }
+        isActive: { type: Boolean, default: true },
+        kyc: Object,
+        bankAccount: Object,
+        nominee: Object,
+        address: Object
     }, { collection: 'users' });
     User = mongoose.model('User', UserSchema);
 }
@@ -28,7 +32,11 @@ const DEMO_USERS = [
         email: 'investor@kfintech.com',
         phoneNumber: '+911234567890',
         role: 'INVESTOR',
-        isActive: true
+        isActive: true,
+        kyc: { status: 'PENDING', aadhaar: '', pan: '', gstNumber: '' },
+        bankAccount: { accountNumber: '9876543210', ifsc: 'HDFC0001234', bankName: 'HDFC Bank' },
+        nominee: { name: 'John Doe', relation: 'Brother', aadhaar: '' },
+        address: { street: '123 Fintech Street', city: 'Mumbai', state: 'MH', zip: '400001' }
     },
     {
         _id: new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a01'),
@@ -70,7 +78,11 @@ async function seedUsers() {
                         passwordHash,
                         phoneNumber: userData.phoneNumber,
                         role: userData.role,
-                        isActive: userData.isActive
+                        isActive: userData.isActive,
+                        kyc: userData.kyc,
+                        bankAccount: userData.bankAccount,
+                        nominee: userData.nominee,
+                        address: userData.address
                     }
                 },
                 { upsert: true, new: true }

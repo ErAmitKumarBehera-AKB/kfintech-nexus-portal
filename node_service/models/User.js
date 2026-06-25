@@ -31,6 +31,28 @@ const UserSchema = new mongoose.Schema({
     isActive: {
         type: Boolean,
         default: true
+    },
+    kyc: {
+        status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING' },
+        aadhaar: String,
+        pan: String,
+        gstNumber: String
+    },
+    bankAccount: {
+        accountNumber: String,
+        ifsc: String,
+        bankName: String
+    },
+    nominee: {
+        name: String,
+        relation: String,
+        aadhaar: String
+    },
+    address: {
+        street: String,
+        city: String,
+        state: String,
+        zip: String
     }
 }, { timestamps: true });
 

@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Ticket = require('../models/Ticket');
+const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
 const { sendEmail } = require('../services/sesService');
 const { sendSMS } = require('../services/snsService');
@@ -31,7 +32,72 @@ exports.finalizeTicket = async (req, res) => {
 
         const previousStatus = ticket.status;
         let newStatus;
-        if (action === 'APPROVE')        newStatus = 'RESOLVED';
+        let userProfileUpdated = false;
+        let updateDetails = {};
+
+        if (action === 'APPROVE') {
+            newStatus = 'RESOLVED';
+            
+            // Phase 4: ACTUAL EXECUTION
+            const user = await User.findById(ticket.investorId._id).session(session);
+            if (user && ticket.serviceMetadata) {
+                switch(ticket.serviceType) {
+                    case 'BANK_ACCOUNT_UPDATE':
+                    case 'BANK_UPDATE': // supporting both based on schema enum
+                        user.bankAccount = {
+                            ...user.bankAccount,
+                            accountNumber: ticket.serviceMetadata.newAccountNumber || ticket.serviceMetadata.accountNumber,
+                            ifsc: ticket.serviceMetadata.newIfsc || ticket.serviceMetadata.ifsc,
+                            bankName: ticket.serviceMetadata.newBankName || ticket.serviceMetadata.bankName
+                        };
+                        userProfileUpdated = true;
+                        updateDetails = { bankAccount: user.bankAccount };
+                        break;
+                    case 'KYC_UPDATE':
+                        user.kyc = { ...user.kyc, status: 'APPROVED' };
+                        userProfileUpdated = true;
+                        updateDetails = { kycStatus: 'APPROVED' };
+                        break;
+                    case 'NOMINEE_UPDATE':
+                        user.nominee = {
+                            ...user.nominee,
+                            name: ticket.serviceMetadata.nomineeName,
+                            relation: ticket.serviceMetadata.nomineeRelation
+                        };
+                        userProfileUpdated = true;
+                        updateDetails = { nominee: user.nominee };
+                        break;
+                    case 'ADDRESS_UPDATE':
+                        user.address = {
+                            ...user.address,
+                            street: ticket.serviceMetadata.newAddress || ticket.serviceMetadata.street,
+                            city: ticket.serviceMetadata.city,
+                            state: ticket.serviceMetadata.state,
+                            zip: ticket.serviceMetadata.zipCode || ticket.serviceMetadata.zip
+                        };
+                        userProfileUpdated = true;
+                        updateDetails = { address: user.address };
+                        break;
+                }
+                if (userProfileUpdated) {
+                    await user.save({ session });
+                    
+                    // Log profile update in AuditLog
+                    const profileAudit = new AuditLog({
+                        entityId: user._id,
+                        entityType: 'User',
+                        action: 'USER_PROFILE_UPDATED',
+                        performedBy: adminId,
+                        details: {
+                            ticketId: ticket._id,
+                            serviceType: ticket.serviceType,
+                            updatedFields: updateDetails
+                        }
+                    });
+                    await profileAudit.save({ session });
+                }
+            }
+        }
         else if (action === 'REJECT')    newStatus = 'REJECTED';
         else                             newStatus = 'L1_REVIEW'; // RETURN_TO_L1
 
