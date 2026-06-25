@@ -1,36 +1,76 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
+const RefreshToken = require('../models/RefreshToken');
 const { sendSMS } = require('../services/snsService');
 const { sendEmail } = require('../services/sesService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_dev_secret_kfintech_2026';
-const JWT_EXPIRES_IN = '15m'; // Short-lived access token
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'fallback_refresh_secret_kfintech_2026';
-const JWT_REFRESH_EXPIRES_IN = '7d';
+const JWT_EXPIRES_IN = '15m';
+const REFRESH_TOKEN_DAYS = 7;
 
-const generateTokens = (user) => {
-    const payload = {
-        userId: user._id.toString(),
-        role: user.role,
-        name: user.name,
-        email: user.email
-    };
-    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-    const refreshToken = jwt.sign({ userId: user._id.toString() }, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN });
-    return { accessToken, refreshToken };
+const getCookieValue = (req, name) => {
+    const rawCookie = req.headers.cookie || '';
+    return rawCookie
+        .split(';')
+        .map(part => part.trim())
+        .find(part => part.startsWith(`${name}=`))
+        ?.split('=')
+        .slice(1)
+        .join('=');
+};
+
+const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+const publicUser = (user) => ({
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    phoneNumber: user.phoneNumber,
+    role: user.role,
+    kyc: user.kyc,
+    bankAccount: user.bankAccount,
+    nominee: user.nominee,
+    address: user.address
+});
+
+const signAccessToken = (user) => jwt.sign({
+    userId: user._id.toString(),
+    role: user.role,
+    name: user.name,
+    email: user.email
+}, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+
+const issueRefreshToken = async (res, user) => {
+    const refreshToken = crypto.randomBytes(48).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_DAYS);
+
+    await RefreshToken.create({
+        userId: user._id,
+        tokenHash: hashToken(refreshToken),
+        expiresAt
+    });
+
+    res.cookie('kfintech_refresh_token', refreshToken, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000
+    });
 };
 
 const generateAndSendOTP = async (phoneNumberOrEmail) => {
     const otp = Math.floor(100000 + Math.random() * 900000);
-    console.log(`[AWS LocalStack] 📲 Sending 6-digit OTP ${otp} to ${phoneNumberOrEmail}`);
+    console.log(`[AWS LocalStack] Sending 6-digit OTP ${otp} to ${phoneNumberOrEmail}`);
 
     try {
         if (phoneNumberOrEmail.includes('@')) {
             await sendEmail({
                 to: phoneNumberOrEmail,
                 subject: 'Your KFintech Login OTP',
-                message: `<h1>Your OTP is: <strong>${otp}</strong></h1><p>Valid for 10 minutes. Do not share this with anyone.</p>`
+                message: `<h1>Your OTP is: <strong>${otp}</strong></h1><p>Valid for 10 minutes. Do not share it.</p>`
             });
         } else {
             await sendSMS({
@@ -39,7 +79,6 @@ const generateAndSendOTP = async (phoneNumberOrEmail) => {
             });
         }
     } catch (error) {
-        // Non-critical: OTP send failure should not block login in dev/test
         console.error('[OTP] Failed to send OTP via AWS LocalStack:', error.message);
     }
 
@@ -54,45 +93,32 @@ exports.register = async (req, res) => {
             return res.status(400).json({ message: 'Name, email, and password are required.' });
         }
 
+        if (password.length < 8) {
+            return res.status(400).json({ message: 'Password must be at least 8 characters.' });
+        }
+
         const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
         if (existingUser) {
             return res.status(400).json({ message: 'Email already registered.' });
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
-
         const newUser = new User({
             name: name.trim(),
             email: email.toLowerCase().trim(),
             passwordHash,
             phoneNumber: phoneNumber ? phoneNumber.trim() : undefined,
-            role: 'INVESTOR', // Default role for open registration
+            role: 'INVESTOR',
             isActive: true
         });
 
         await newUser.save();
-
-        const { accessToken, refreshToken } = generateTokens(newUser);
-        
-        newUser.refreshTokens.push(refreshToken);
-        await newUser.save();
-
-        res.cookie('kfintech_refresh_token', refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-        });
+        await issueRefreshToken(res, newUser);
 
         return res.status(201).json({
             message: 'Registration successful.',
-            accessToken,
-            user: {
-                id: newUser._id,
-                name: newUser.name,
-                email: newUser.email,
-                role: newUser.role
-            }
+            accessToken: signAccessToken(newUser),
+            user: publicUser(newUser)
         });
     } catch (error) {
         console.error('[Auth] Register error:', error);
@@ -100,63 +126,37 @@ exports.register = async (req, res) => {
     }
 };
 
-
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // 1. Input validation
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required.' });
         }
 
-        // 2. Locate user — explicitly select passwordHash (excluded by default via select:false)
         const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+passwordHash');
-        if (!user) {
+        if (!user || !user.isActive) {
             return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
-        // 3. Check if account is active
-        if (!user.isActive) {
-            return res.status(403).json({ message: 'Account is disabled. Contact your administrator.' });
-        }
-
-        // 4. Cryptographic password verification
         const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) {
             return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
-        // 5. MFA Notification
         try {
             await generateAndSendOTP(user.email);
         } catch (otpErr) {
             console.warn('[OTP] Skipped OTP step:', otpErr.message);
         }
 
-        const { accessToken, refreshToken } = generateTokens(user);
-        
-        user.refreshTokens.push(refreshToken);
-        await user.save();
-
-        res.cookie('kfintech_refresh_token', refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-        });
+        await issueRefreshToken(res, user);
 
         return res.status(200).json({
             message: 'Login successful.',
-            accessToken,
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role
-            }
+            accessToken: signAccessToken(user),
+            user: publicUser(user)
         });
-
     } catch (error) {
         console.error('[Auth] Login error:', error);
         return res.status(500).json({ message: 'Internal server error.' });
@@ -165,59 +165,67 @@ exports.login = async (req, res) => {
 
 exports.me = async (req, res) => {
     try {
-        // req.user is populated by the authenticate middleware
         const user = await User.findById(req.user.userId);
         if (!user || !user.isActive) {
             return res.status(401).json({ message: 'User not found or account disabled.' });
         }
 
-        return res.status(200).json({
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role
-            }
-        });
+        return res.status(200).json({ user: publicUser(user) });
     } catch (error) {
         console.error('[Auth] /me error:', error);
         return res.status(500).json({ message: 'Internal server error.' });
     }
 };
+
 exports.refresh = async (req, res) => {
     try {
-        const refreshToken = req.cookies.kfintech_refresh_token;
+        const refreshToken = getCookieValue(req, 'kfintech_refresh_token');
         if (!refreshToken) {
-            return res.status(401).json({ message: 'Refresh token not found.' });
+            return res.status(401).json({ message: 'Refresh token missing.' });
         }
 
-        const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
-        const user = await User.findById(decoded.userId);
-
-        if (!user || !user.isActive || !user.refreshTokens.includes(refreshToken)) {
-            return res.status(403).json({ message: 'Invalid refresh token.' });
-        }
-
-        // Rotate tokens
-        user.refreshTokens = user.refreshTokens.filter(rt => rt !== refreshToken);
-        const tokens = generateTokens(user);
-        
-        user.refreshTokens.push(tokens.refreshToken);
-        await user.save();
-
-        res.cookie('kfintech_refresh_token', tokens.refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000
+        const storedToken = await RefreshToken.findOne({
+            tokenHash: hashToken(refreshToken),
+            revokedAt: null,
+            expiresAt: { $gt: new Date() }
         });
+        if (!storedToken) {
+            return res.status(401).json({ message: 'Refresh token expired or revoked.' });
+        }
+
+        const user = await User.findById(storedToken.userId);
+        if (!user || !user.isActive) {
+            return res.status(401).json({ message: 'User not found or disabled.' });
+        }
 
         return res.status(200).json({
-            accessToken: tokens.accessToken
+            accessToken: signAccessToken(user),
+            user: publicUser(user)
+        });
+    } catch (error) {
+        console.error('[Auth] refresh error:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+};
+
+exports.updateProfile = async (req, res) => {
+    try {
+        const allowed = ['name', 'phoneNumber', 'bankAccount', 'nominee', 'address'];
+        const updates = {};
+        allowed.forEach(key => {
+            if (req.body[key] !== undefined) updates[key] = req.body[key];
         });
 
+        const user = await User.findByIdAndUpdate(req.user.id, updates, {
+            new: true,
+            runValidators: true
+        });
+        if (!user) return res.status(404).json({ message: 'User not found.' });
+
+        return res.status(200).json({ message: 'Profile updated.', user: publicUser(user) });
     } catch (error) {
-        return res.status(403).json({ message: 'Refresh token expired or invalid.' });
+        console.error('[Auth] updateProfile error:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
     }
 };
 
@@ -238,5 +246,32 @@ exports.logout = async (req, res) => {
         console.error('[Auth] Logout error:', error);
         res.clearCookie('kfintech_refresh_token');
         return res.status(500).json({ message: 'Error during logout.' });
+    }
+};
+
+exports.changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword || newPassword.length < 8) {
+            return res.status(400).json({ message: 'Current password and a new password of at least 8 characters are required.' });
+        }
+
+        const user = await User.findById(req.user.id).select('+passwordHash');
+        if (!user) return res.status(404).json({ message: 'User not found.' });
+
+        const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+        if (!isMatch) return res.status(401).json({ message: 'Current password is incorrect.' });
+
+        user.passwordHash = await bcrypt.hash(newPassword, 10);
+        // Invalidate all sessions
+        user.refreshTokens = [];
+        await user.save();
+        
+        res.clearCookie('kfintech_refresh_token');
+
+        return res.status(200).json({ message: 'Password changed. Please sign in again.' });
+    } catch (error) {
+        console.error('[Auth] changePassword error:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
     }
 };

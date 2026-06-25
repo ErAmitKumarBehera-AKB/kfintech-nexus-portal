@@ -27,10 +27,16 @@ const TicketSchema = new mongoose.Schema({
         fileType: String,
         size: Number,
         s3Key: String,
+        status: {
+            type: String,
+            enum: ['PENDING', 'VERIFIED', 'REJECTED'],
+            default: 'PENDING'
+        },
         uploadedAt: { type: Date, default: Date.now },
         ocrExtraction: {
             extractedText: String,
-            matchVerified: Boolean
+            matchVerified: Boolean,
+            confidence: Number
         }
     }],
     aiSentimentScore: {
@@ -64,13 +70,52 @@ const TicketSchema = new mongoose.Schema({
         type: String,
         default: null
     },
+    l1Notes: {
+        type: String,
+        default: null
+    },
+    revisionReason: {
+        type: String,
+        default: null
+    },
+    assignedL1: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    assignedL2: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    comments: [{
+        authorId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
+        },
+        authorRole: String,
+        message: {
+            type: String,
+            required: true
+        },
+        visibility: {
+            type: String,
+            enum: ['INVESTOR_ADMIN', 'INTERNAL'],
+            default: 'INVESTOR_ADMIN'
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
     slaTimeline: {
         slaDays: { type: Number, default: 7 },
         deadline: { type: Date }
     },
     status: {
         type: String,
-        enum: ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'L1_REVIEW', 'L2_APPROVAL', 'APPROVED', 'REJECTED'],
+        enum: ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'L1_REVIEW', 'L2_APPROVAL', 'APPROVED', 'REJECTED', 'ON_HOLD'],
         default: 'OPEN'
     }
 }, { timestamps: true });

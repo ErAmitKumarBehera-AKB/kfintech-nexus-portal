@@ -9,6 +9,12 @@ const TicketDetail = ({ ticketId, onBack }) => {
     const [timeline, setTimeline] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    // New Features State
+    const [newComment, setNewComment] = useState("");
+    const [submittingComment, setSubmittingComment] = useState(false);
+    const [resubmitFile, setResubmitFile] = useState(null);
+    const [resubmitting, setResubmitting] = useState(false);
+
     useEffect(() => {
         const fetchTicketDetails = async () => {
             try {
@@ -19,6 +25,46 @@ const TicketDetail = ({ ticketId, onBack }) => {
                 console.error('Failed to fetch ticket:', error);
             } finally {
                 setIsLoading(false);
+            }
+        };
+
+        const handleAddComment = async (e) => {
+            e.preventDefault();
+            if (!newComment.trim()) return;
+            setSubmittingComment(true);
+            try {
+                const res = await apiClient.post(`/tickets/${ticketId}/comments`, { message: newComment });
+                setTicket({ ...ticket, comments: res.data.comments });
+                setNewComment("");
+                // Refresh to update timeline
+                const refreshRes = await apiClient.get(`/tickets/${ticketId}`);
+                setTimeline(refreshRes.data.timeline);
+            } catch (err) {
+                console.error("Failed to add comment:", err);
+            } finally {
+                setSubmittingComment(false);
+            }
+        };
+
+        const handleResubmit = async (e) => {
+            e.preventDefault();
+            if (!resubmitFile) return;
+            setResubmitting(true);
+            try {
+                const formData = new FormData();
+                formData.append('document', resubmitFile);
+                await apiClient.post(`/tickets/${ticketId}/resubmit`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                // Refresh
+                const refreshRes = await apiClient.get(`/tickets/${ticketId}`);
+                setTicket(refreshRes.data.ticket);
+                setTimeline(refreshRes.data.timeline);
+                setResubmitFile(null);
+            } catch (err) {
+                console.error("Failed to resubmit ticket:", err);
+            } finally {
+                setResubmitting(false);
             }
         };
 
@@ -110,10 +156,48 @@ const TicketDetail = ({ ticketId, onBack }) => {
                                         <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-kfintech-bg border-2 border-kfintech-primary" />
                                         <p className="text-sm font-bold text-white mb-1">{log.action.replace(/_/g, ' ')}</p>
                                         {log.details?.note && <p className="text-xs text-gray-400">{log.details.note}</p>}
-                                        <p className="text-[10px] text-gray-500 mt-2 font-bold uppercase tracking-wider">{format(new Date(log.timestamp), 'MMM dd, yyyy HH:mm')}</p>
+                                        <p className="text-[10px] text-gray-500 mt-2 font-bold uppercase tracking-wider">{format(new Date(log.createdAt || log.timestamp), 'MMM dd, yyyy HH:mm')}</p>
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                        </div>
+                        
+                        {/* Comments Section */}
+                        <div className="mt-8 pt-8 border-t border-white/5">
+                            <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-4">Comments</h3>
+                            
+                            <div className="space-y-4 mb-6">
+                                {ticket.comments?.map((comment, idx) => (
+                                    <div key={idx} className="p-4 rounded-xl bg-white/5 border border-white/5">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-bold text-kfintech-primary uppercase tracking-wider">{comment.authorRole.replace('_', ' ')}</span>
+                                            <span className="text-[10px] text-gray-500">{format(new Date(comment.createdAt), 'MMM dd, HH:mm')}</span>
+                                        </div>
+                                        <p className="text-sm text-gray-300">{comment.message}</p>
+                                    </div>
+                                ))}
+                                {(!ticket.comments || ticket.comments.length === 0) && (
+                                    <p className="text-sm text-gray-500 italic">No comments yet.</p>
+                                )}
+                            </div>
+
+                            <form onSubmit={handleAddComment} className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    value={newComment}
+                                    onChange={(e) => setNewComment(e.target.value)}
+                                    placeholder="Add a comment..."
+                                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-kfintech-primary transition-colors"
+                                />
+                                <button 
+                                    type="submit" 
+                                    disabled={submittingComment || !newComment.trim()}
+                                    className="px-6 py-3 bg-kfintech-primary hover:bg-opacity-90 disabled:opacity-50 text-white font-bold rounded-xl text-sm transition-all"
+                                >
+                                    {submittingComment ? 'Sending...' : 'Post'}
+                                </button>
+                            </form>
                         </div>
                     </div>
 
@@ -174,10 +258,39 @@ const TicketDetail = ({ ticketId, onBack }) => {
                                 </div>
                             )}
                         </div>
+
+                        {/* Resubmit Flow for Rejected Tickets */}
+                        {ticket.status === 'REJECTED' && (
+                            <div className="bg-red-500/10 p-5 rounded-xl border border-red-500/20 space-y-4">
+                                <div>
+                                    <h3 className="text-sm font-bold text-red-400 mb-1">Ticket Rejected</h3>
+                                    <p className="text-xs text-red-400/80 mb-4">Please upload the correct documentation to resubmit this request.</p>
+                                    {ticket.revisionReason && (
+                                        <div className="mb-4 p-3 bg-red-500/20 rounded-lg text-xs text-white">
+                                            <strong>Reason:</strong> {ticket.revisionReason}
+                                        </div>
+                                    )}
+                                </div>
+                                <form onSubmit={handleResubmit} className="space-y-3">
+                                    <input 
+                                        type="file" 
+                                        onChange={(e) => setResubmitFile(e.target.files[0])}
+                                        className="block w-full text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-white/10 file:text-white hover:file:bg-white/20 transition-colors"
+                                        required
+                                    />
+                                    <button 
+                                        type="submit"
+                                        disabled={resubmitting || !resubmitFile}
+                                        className="w-full py-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors"
+                                    >
+                                        {resubmitting ? 'Uploading...' : 'Resubmit Ticket'}
+                                    </button>
+                                </form>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
-        </div>
     );
 };
 

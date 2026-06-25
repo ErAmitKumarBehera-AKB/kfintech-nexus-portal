@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const axios = require('axios');
 const Ticket = require('../models/Ticket');
 const AuditLog = require('../models/AuditLog');
+const { getServiceConfig, buildSlaTimeline } = require('../utils/serviceTypes');
 
 const FormData = require('form-data');
 const { v4: uuidv4 } = require("uuid");
@@ -27,6 +28,21 @@ exports.createTicket = async (req, res) => {
 
     if (!finalDescription) {
         return res.status(400).json({ message: "description is required." });
+    }
+
+    // Validate against Service Configuration
+    const serviceConfig = getServiceConfig(serviceType);
+    
+    // Check required fields
+    for (const field of serviceConfig.requiredFields) {
+        if (!serviceMetadata[field] && !req.body[field]) {
+            return res.status(400).json({ message: `Missing required field for ${serviceConfig.label}: ${field}` });
+        }
+    }
+
+    // Check required documents
+    if (serviceConfig.requiredDocuments.length > 0 && !file) {
+        return res.status(400).json({ message: `Missing required document for ${serviceConfig.label}: ${serviceConfig.requiredDocuments[0]}` });
     }
 
     const session = await mongoose.startSession();
@@ -122,11 +138,9 @@ exports.createTicket = async (req, res) => {
                 console.error("LocalStack S3 Upload Error:", error.message);
             }
         }
-
-        const deadline = new Date();
-        deadline.setDate(deadline.getDate() + 7); // Default SLA
-
-        // 4. Create Ticket Document
+        // 4. Create Ticket Document with dynamic SLA
+        const slaConfig = buildSlaTimeline(serviceType);
+        
         const newTicket = new Ticket({
             investorId,
             investorName,
@@ -148,8 +162,11 @@ exports.createTicket = async (req, res) => {
             aiSummary,
             isPotentialFraud: aiPayload.fraud_alert || false,
             serviceType: serviceType || 'COMPLAINT',
-            serviceMetadata: serviceMetadata || {},
-            slaTimeline: { slaDays: 7, deadline },
+            serviceMetadata,
+            slaTimeline: {
+                slaDays: slaConfig.slaDays,
+                deadline: slaConfig.deadline
+            },
             status: 'OPEN'
         });
 
@@ -196,8 +213,25 @@ exports.getTickets = async (req, res) => {
         // Optional filters
         if (req.query.status) query.status = req.query.status;
 
-        const tickets = await Ticket.find(query).sort({ createdAt: -1 });
-        return res.status(200).json({ tickets });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const tickets = await Ticket.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+            
+        const total = await Ticket.countDocuments(query);
+        
+        return res.status(200).json({ 
+            tickets,
+            pagination: {
+                total,
+                page,
+                pages: Math.ceil(total / limit)
+            }
+        });
     } catch (error) {
         console.error("[Ticket] getTickets error:", error);
         return res.status(500).json({ message: "Internal server error" });
@@ -207,21 +241,139 @@ exports.getTickets = async (req, res) => {
 exports.getTicketById = async (req, res) => {
     try {
         const ticket = await Ticket.findById(req.params.id);
+
         if (!ticket) {
             return res.status(404).json({ message: "Ticket not found" });
         }
+
+        if (
+            req.user &&
+            req.user.role === "INVESTOR" &&
+            ticket.investorId.toString() !== req.user.id
+        ) {
+            return res.status(403).json({
+                message: "Unauthorized access to this ticket",
+            });
+        }
+
+        const timeline = await AuditLog.find({
+            entityId: ticket._id,
+        }).sort({ createdAt: 1 });
+
+        return res.status(200).json({ ticket, timeline });
+
+    } catch (error) {
+        console.error("Get Ticket Error:", error);
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: error.message,
+        });
+    }
+};
+
+exports.addComment = async (req, res) => {
+    try {
+        const ticketId = req.params.id;
+        const { message, visibility = 'INVESTOR_ADMIN' } = req.body;
         
-        // Authorization: Investor can only see their own tickets
-        if (req.user && req.user.role === 'INVESTOR' && ticket.investorId.toString() !== req.user.id) {
+        if (!message) return res.status(400).json({ message: "Comment message is required." });
+
+        const ticket = await Ticket.findById(ticketId);
+        if (!ticket) return res.status(404).json({ message: "Ticket not found." });
+
+        if (req.user.role === 'INVESTOR' && ticket.investorId.toString() !== req.user.id) {
             return res.status(403).json({ message: "Unauthorized access to this ticket" });
         }
 
-        // Fetch audit logs (timeline)
-        const timeline = await AuditLog.find({ entityId: ticket._id }).sort({ timestamp: 1 });
+        ticket.comments.push({
+            authorId: req.user.id,
+            authorRole: req.user.role,
+            message,
+            visibility: req.user.role === 'INVESTOR' ? 'INVESTOR_ADMIN' : visibility
+        });
 
-        return res.status(200).json({ ticket, timeline });
+        await ticket.save();
+        
+        await AuditLog.create({
+            entityId: ticket._id,
+            entityType: 'Ticket',
+            action: 'COMMENT_ADDED',
+            performedBy: req.user.id,
+            details: { note: `Comment added by ${req.user.role}` }
+        });
+
+        return res.status(200).json({ message: "Comment added", comments: ticket.comments });
     } catch (error) {
-        console.error("[Ticket] getTicketById error:", error);
+        console.error("[Ticket] addComment error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+exports.resubmitTicket = async (req, res) => {
+    try {
+        const ticketId = req.params.id;
+        const file = req.file;
+
+        const ticket = await Ticket.findById(ticketId);
+        if (!ticket) return res.status(404).json({ message: "Ticket not found." });
+
+        if (req.user.role === 'INVESTOR' && ticket.investorId.toString() !== req.user.id) {
+            return res.status(403).json({ message: "Unauthorized access to this ticket" });
+        }
+
+        if (ticket.status !== 'REJECTED') {
+            return res.status(400).json({ message: "Only REJECTED tickets can be resubmitted." });
+        }
+
+        if (!file) {
+            return res.status(400).json({ message: "New document is required for resubmission." });
+        }
+
+        let documentUrl = null;
+        let documentName = file.originalname;
+        const fileName = `${uuidv4()}-${file.originalname}`;
+        try {
+            await uploadToS3({
+                Key: fileName,
+                Body: file.buffer,
+                ContentType: file.mimetype,
+            });
+            const endpoint = process.env.AWS_ENDPOINT_URL || 'http://localhost:4566';
+            const bucket = process.env.AWS_BUCKET_NAME || 'kfintech-bucket';
+            documentUrl = `${endpoint}/${bucket}/${encodeURIComponent(fileName)}`;
+        } catch (error) {
+            console.error("LocalStack S3 Upload Error:", error.message);
+        }
+
+        ticket.documents.push({
+            name: documentName,
+            fileType: file.mimetype,
+            size: file.size,
+            s3Key: documentUrl,
+            status: 'PENDING'
+        });
+
+        // Reset status
+        ticket.status = 'OPEN';
+        ticket.l2ReturnNote = null;
+        ticket.l1Notes = null;
+        ticket.revisionReason = null;
+        ticket.assignedL1 = null;
+        ticket.assignedL2 = null;
+
+        await ticket.save();
+
+        await AuditLog.create({
+            entityId: ticket._id,
+            entityType: 'Ticket',
+            action: 'TICKET_RESUBMITTED',
+            performedBy: req.user.id,
+            details: { note: 'Investor uploaded new document and resubmitted the ticket.' }
+        });
+
+        return res.status(200).json({ message: "Ticket resubmitted successfully.", ticket });
+    } catch (error) {
+        console.error("[Ticket] resubmitTicket error:", error);
         return res.status(500).json({ message: "Internal server error" });
     }
 };

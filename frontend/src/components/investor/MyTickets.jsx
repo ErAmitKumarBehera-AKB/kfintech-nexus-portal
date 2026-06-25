@@ -7,12 +7,16 @@ const MyTickets = ({ onSelectTicket }) => {
     const [tickets, setTickets] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState('ALL');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
 
     useEffect(() => {
         const fetchTickets = async () => {
+            setIsLoading(true);
             try {
-                const response = await apiClient.get('/tickets');
+                const response = await apiClient.get(`/tickets?page=${page}&limit=10${filter !== 'ALL' ? `&status=${filter}` : ''}`);
                 setTickets(response.data.tickets || []);
+                setTotalPages(response.data.pagination?.pages || 1);
             } catch (error) {
                 console.error('Failed to fetch tickets:', error);
             } finally {
@@ -21,9 +25,9 @@ const MyTickets = ({ onSelectTicket }) => {
         };
 
         fetchTickets();
-    }, []);
+    }, [page, filter]);
 
-    const filteredTickets = tickets.filter(t => filter === 'ALL' || t.status === filter);
+    const filteredTickets = tickets; // Filtering is now handled backend-side via API call
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -61,7 +65,7 @@ const MyTickets = ({ onSelectTicket }) => {
                     </div>
                     <select 
                         value={filter} 
-                        onChange={(e) => setFilter(e.target.value)}
+                        onChange={(e) => { setFilter(e.target.value); setPage(1); }}
                         className="bg-kfintech-card border border-kfintech-border rounded-lg px-4 py-2 text-sm text-white cursor-pointer"
                     >
                         <option value="ALL">All Status</option>
@@ -114,6 +118,29 @@ const MyTickets = ({ onSelectTicket }) => {
                     </div>
                 )}
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-4 mt-6">
+                    <button
+                        disabled={page === 1}
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        className="px-4 py-2 bg-kfintech-card border border-kfintech-border rounded-lg text-sm font-bold text-white disabled:opacity-50 hover:bg-white/5 transition-colors"
+                    >
+                        Previous
+                    </button>
+                    <span className="text-sm text-gray-400">
+                        Page <span className="text-white font-bold">{page}</span> of <span className="text-white font-bold">{totalPages}</span>
+                    </span>
+                    <button
+                        disabled={page === totalPages}
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        className="px-4 py-2 bg-kfintech-card border border-kfintech-border rounded-lg text-sm font-bold text-white disabled:opacity-50 hover:bg-white/5 transition-colors"
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

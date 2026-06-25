@@ -16,4 +16,10 @@ router.get('/', authenticate, ticketController.getTickets);
 // Get specific ticket and timeline
 router.get('/:id', authenticate, ticketController.getTicketById);
 
+// POST /api/tickets/:id/comments
+router.post('/:id/comments', authenticate, ticketController.addComment);
+
+// POST /api/tickets/:id/resubmit
+router.post('/:id/resubmit', authenticate, upload.single('document'), ticketController.resubmitTicket);
+
 module.exports = router;

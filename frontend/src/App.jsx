@@ -6,12 +6,14 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import ChatbotWidget from './components/common/ChatbotWidget';
 
+import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import InvestorDashboard from './pages/InvestorDashboard';
 import L1MakerDesk from './pages/L1MakerDesk';
 import L2CheckerDesk from './pages/L2CheckerDesk';
 import AdminDashboard from './pages/AdminDashboard';
+import ProfilePage from './pages/ProfilePage';
 
 const AppRoutes = () => {
     const { user, isAuthenticated } = useAuth();
@@ -29,6 +31,11 @@ const AppRoutes = () => {
             <main className={`flex-grow ${isAuthenticated ? 'container mx-auto max-w-7xl mt-6' : ''}`}>
                 <Routes>
                     {/* ── Public Routes ── */}
+                    <Route 
+                        path="/" 
+                        element={<LandingPage />} 
+                    />
+
                     <Route
                         path="/login"
                         element={
@@ -84,6 +91,16 @@ const AppRoutes = () => {
                         element={
                             <ProtectedRoute allowedRoles={['ADMIN_SUPER']}>
                                 <AdminDashboard />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* ── Protected: Profile Page ── */}
+                    <Route
+                        path="/profile"
+                        element={
+                            <ProtectedRoute allowedRoles={['INVESTOR', 'ADMIN_L1', 'ADMIN_L2', 'ADMIN_SUPER']}>
+                                <ProfilePage />
                             </ProtectedRoute>
                         }
                     />
