@@ -4,6 +4,7 @@ import { AuthProvider, useAuth, getRoleDefaultRoute } from './context/AuthContex
 
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
+import ChatbotWidget from './components/common/ChatbotWidget';
 
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -17,8 +18,13 @@ const AppRoutes = () => {
 
     return (
         <div className="min-h-screen bg-kfintech-bg font-sans flex flex-col">
-            {/* Navbar is only shown when the user is logged in */}
-            {isAuthenticated && <Navbar />}
+            {/* Navbar and Chatbot are only shown when the user is logged in */}
+            {isAuthenticated && (
+                <>
+                    <Navbar />
+                    <ChatbotWidget />
+                </>
+            )}
 
             <main className={`flex-grow ${isAuthenticated ? 'container mx-auto max-w-7xl mt-6' : ''}`}>
                 <Routes>
