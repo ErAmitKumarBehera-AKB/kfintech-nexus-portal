@@ -24,6 +24,10 @@ router.get('/metrics', authenticate, authorize('ADMIN_SUPER'), adminController.g
 // SuperAdmin user management
 router.get('/users', authenticate, authorize('ADMIN_SUPER'), adminController.getAllUsers);
 
+// Route: PUT /api/admin/users/:id/status
+// SuperAdmin user activation/deactivation
+router.put('/users/:id/status', authenticate, authorize('ADMIN_SUPER'), adminController.updateUserStatus);
+
 // Route: GET /api/admin/tickets
 // SuperAdmin all tickets
 router.get('/tickets', authenticate, authorize('ADMIN_SUPER'), adminController.getAllTickets);

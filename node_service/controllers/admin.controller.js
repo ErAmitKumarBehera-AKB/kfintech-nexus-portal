@@ -4,6 +4,7 @@ const FormData = require('form-data');
 const { v4: uuidv4 } = require('uuid');
 const Ticket = require('../models/Ticket');
 const AuditLog = require('../models/AuditLog');
+const User = require('../models/User');
 const { uploadToS3 } = require('../services/s3Service');
 
 exports.verifyInvestorDocument = async (req, res) => {
@@ -217,6 +218,8 @@ exports.getSystemMetrics = async (req, res) => {
         const rejectionRate = totalTickets > 0 ? (rejectedTickets / totalTickets) * 100 : 0;
         const resolutionRate = totalTickets > 0 ? (resolvedTickets / totalTickets) * 100 : 0;
 
+        const slaBreachedTickets = await Ticket.countDocuments({ "slaTimeline.isBreached": true });
+
         const serviceTypeDataRaw = await Ticket.aggregate([
             { $group: { _id: "$serviceType", count: { $sum: 1 } } }
         ]);
@@ -233,6 +236,7 @@ exports.getSystemMetrics = async (req, res) => {
             rejectionRate,
             resolutionRate,
             openTickets,
+            slaBreachedTickets,
             serviceTypeData,
             statusData
         });
@@ -244,8 +248,27 @@ exports.getSystemMetrics = async (req, res) => {
 // SuperAdmin Endpoint: Users
 exports.getAllUsers = async (req, res) => {
     try {
-        const users = await User.find().select('-passwordHash').sort({ createdAt: -1 });
-        return res.status(200).json({ users });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const role = req.query.role;
+
+        const query = {};
+        if (role && role !== 'ALL') {
+            query.role = role;
+        }
+
+        const users = await User.find(query)
+            .select('-passwordHash')
+            .sort({ createdAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit);
+        
+        const total = await User.countDocuments(query);
+
+        return res.status(200).json({ 
+            users, 
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } 
+        });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -254,10 +277,34 @@ exports.getAllUsers = async (req, res) => {
 // SuperAdmin Endpoint: All Tickets
 exports.getAllTickets = async (req, res) => {
     try {
-        const tickets = await Ticket.find()
-            .select('investorName serviceType status assignedPriority createdAt slaTimeline aiSentimentScore')
-            .sort({ createdAt: -1 });
-        return res.status(200).json({ tickets });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const { status, serviceType, priority, dateRange } = req.query;
+
+        const query = {};
+        if (status && status !== 'ALL') query.status = status;
+        if (serviceType && serviceType !== 'ALL') query.serviceType = serviceType;
+        if (priority && priority !== 'ALL') query.assignedPriority = priority;
+        
+        if (dateRange && dateRange !== 'ALL') {
+            const days = parseInt(dateRange.replace('d', ''));
+            if (!isNaN(days)) {
+                query.createdAt = { $gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) };
+            }
+        }
+
+        const tickets = await Ticket.find(query)
+            .select('investorName serviceType status assignedPriority createdAt slaTimeline aiSentimentScore isPotentialFraud')
+            .sort({ createdAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit);
+
+        const total = await Ticket.countDocuments(query);
+
+        return res.status(200).json({ 
+            tickets,
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } 
+        });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -284,7 +331,17 @@ exports.getFlaggedTickets = async (req, res) => {
 // SuperAdmin Endpoint: Export Reports (CSV)
 exports.exportReports = async (req, res) => {
     try {
-        const tickets = await Ticket.find()
+        const { dateRange } = req.query;
+        const query = {};
+        
+        if (dateRange && dateRange !== 'ALL') {
+            const days = parseInt(dateRange.replace('d', ''));
+            if (!isNaN(days)) {
+                query.createdAt = { $gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) };
+            }
+        }
+
+        const tickets = await Ticket.find(query)
             .select('ticketId investorName serviceType status assignedPriority isPotentialFraud createdAt resolvedAt')
             .sort({ createdAt: -1 });
 
@@ -308,6 +365,39 @@ exports.exportReports = async (req, res) => {
         res.setHeader('Content-Disposition', 'attachment; filename="nexus_reports_export.csv"');
         
         return res.status(200).send(csv);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+};
+
+// SuperAdmin Endpoint: Update User Status (Activate/Deactivate)
+exports.updateUserStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isActive } = req.body;
+        const adminId = req.user ? req.user.id : null;
+
+        const user = await User.findById(id);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        // Prevent self-deactivation (optional safety check)
+        if (adminId && adminId.toString() === id) {
+            return res.status(400).json({ message: "Cannot deactivate your own admin account." });
+        }
+
+        user.isActive = isActive;
+        await user.save();
+
+        const auditLog = new AuditLog({
+            entityId: user._id,
+            entityType: 'User',
+            action: isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+            performedBy: adminId || user._id,
+            details: { note: `User status changed to ${isActive ? 'ACTIVE' : 'INACTIVE'}` }
+        });
+        await auditLog.save();
+
+        return res.status(200).json({ message: "User status updated successfully", user });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

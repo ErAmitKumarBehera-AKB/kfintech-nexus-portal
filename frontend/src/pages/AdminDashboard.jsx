@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, Users, Activity, FileText, AlertTriangle, CheckCircle2, Clock, XCircle, Search, Download } from 'lucide-react';
+import { ShieldCheck, Users, Activity, FileText, AlertTriangle, CheckCircle2, Clock, XCircle, Search, Download, ChevronLeft, ChevronRight, Power } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/client';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -45,9 +45,23 @@ const AdminDashboard = () => {
     const [flaggedList, setFlaggedList] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // Filters and Pagination
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const limit = 20;
+
+    const [dateRange, setDateRange] = useState('ALL');
+    const [userRole, setUserRole] = useState('ALL');
+    const [ticketStatus, setTicketStatus] = useState('ALL');
+    const [ticketPriority, setTicketPriority] = useState('ALL');
+
+    useEffect(() => {
+        setPage(1); // Reset page on tab change or filter change
+    }, [activeTab, dateRange, userRole, ticketStatus, ticketPriority]);
+
     useEffect(() => {
         fetchData();
-    }, [activeTab]);
+    }, [activeTab, page, dateRange, userRole, ticketStatus, ticketPriority]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -56,14 +70,18 @@ const AdminDashboard = () => {
                 const res = await apiClient.get('/admin/metrics');
                 setMetrics(res.data);
             } else if (activeTab === 'USERS') {
-                const res = await apiClient.get('/admin/users');
+                const res = await apiClient.get(`/admin/users?page=${page}&limit=${limit}&role=${userRole}`);
                 setUsersList(res.data.users);
+                setTotalPages(res.data.pagination.totalPages);
             } else if (activeTab === 'TICKETS') {
-                const res = await apiClient.get('/admin/tickets');
+                const res = await apiClient.get(`/admin/tickets?page=${page}&limit=${limit}&status=${ticketStatus}&priority=${ticketPriority}&dateRange=${dateRange}`);
                 setTicketsList(res.data.tickets);
+                setTotalPages(res.data.pagination.totalPages);
             } else if (activeTab === 'FLAGGED') {
+                // Flagged doesn't currently support generic pagination in backend, but let's assume it does or we just fetch it
                 const res = await apiClient.get('/admin/tickets/flagged');
                 setFlaggedList(res.data.tickets);
+                setTotalPages(1);
             }
         } catch (error) {
             console.error("Error fetching admin data", error);
@@ -74,16 +92,26 @@ const AdminDashboard = () => {
 
     const handleExportCsv = async () => {
         try {
-            const res = await apiClient.get('/admin/reports/export', { responseType: 'blob' });
+            const res = await apiClient.get(`/admin/reports/export?dateRange=${dateRange}`, { responseType: 'blob' });
             const url = window.URL.createObjectURL(new Blob([res.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', 'nexus_reports_export.csv');
+            link.setAttribute('download', `nexus_reports_${dateRange}.csv`);
             document.body.appendChild(link);
             link.click();
             link.parentNode.removeChild(link);
         } catch (error) {
             console.error("Export failed", error);
+        }
+    };
+
+    const handleToggleUserStatus = async (userId, currentStatus) => {
+        try {
+            await apiClient.put(`/admin/users/${userId}/status`, { isActive: !currentStatus });
+            // Refresh users
+            fetchData();
+        } catch (error) {
+            console.error("Failed to toggle user status", error);
         }
     };
 
@@ -100,6 +128,29 @@ const AdminDashboard = () => {
         if(type === 'phone') return str.slice(0, -4).replace(/./g, '*') + str.slice(-4);
         return str;
     };
+
+    // Pagination Component
+    const Pagination = () => (
+        <div className="flex justify-between items-center px-6 py-4 border-t border-kfintech-border/50 bg-kfintech-card/30">
+            <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Page {page} of {totalPages || 1}</span>
+            <div className="flex gap-2">
+                <button 
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 transition-colors text-gray-400"
+                >
+                    <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button 
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 transition-colors text-gray-400"
+                >
+                    <ChevronRight className="w-4 h-4" />
+                </button>
+            </div>
+        </div>
+    );
 
     // Tab Renderers
     const renderMetrics = () => {
@@ -118,10 +169,10 @@ const AdminDashboard = () => {
                         color="bg-emerald-500/10 border-emerald-500/30" glow="0 0 20px rgba(16,185,129,0.08)"
                     />
                     <StatCard 
-                        icon={<CheckCircle2 className="w-6 h-6 text-purple-400" />}
-                        label="Resolution Rate" value={`${metrics.resolutionRate.toFixed(1)}%`}
-                        subtext={`${metrics.openTickets} tickets open`}
-                        color="bg-purple-500/10 border-purple-500/30" glow="0 0 20px rgba(139,92,246,0.08)"
+                        icon={<AlertTriangle className="w-6 h-6 text-orange-400" />}
+                        label="SLA Breached" value={metrics.slaBreachedTickets || 0}
+                        subtext="Tickets past deadline"
+                        color="bg-orange-500/10 border-orange-500/30" glow="0 0 20px rgba(245,158,11,0.08)"
                     />
                     <StatCard 
                         icon={<XCircle className="w-6 h-6 text-red-400" />}
@@ -171,11 +222,24 @@ const AdminDashboard = () => {
     };
 
     const renderUsers = () => (
-        <div className="glass-panel rounded-2xl border border-kfintech-border overflow-hidden">
-            <div className="p-4 border-b border-kfintech-border/50 bg-kfintech-card/50 flex justify-between items-center">
+        <div className="glass-panel rounded-2xl border border-kfintech-border overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-kfintech-border/50 bg-kfintech-card/50 flex flex-col md:flex-row justify-between items-center gap-4">
                 <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
                     <Users className="w-5 h-5 text-emerald-400" /> User Directory
                 </h2>
+                <div className="flex gap-2">
+                    <select 
+                        value={userRole} 
+                        onChange={(e) => setUserRole(e.target.value)}
+                        className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-kfintech-primary"
+                    >
+                        <option value="ALL">All Roles</option>
+                        <option value="INVESTOR">Investors</option>
+                        <option value="ADMIN_L1">L1 Admins</option>
+                        <option value="ADMIN_L2">L2 Admins</option>
+                        <option value="ADMIN_SUPER">Super Admins</option>
+                    </select>
+                </div>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -185,7 +249,7 @@ const AdminDashboard = () => {
                             <th className="px-6 py-4 font-bold">Email</th>
                             <th className="px-6 py-4 font-bold">Role</th>
                             <th className="px-6 py-4 font-bold">Status</th>
-                            <th className="px-6 py-4 font-bold text-right">Joined</th>
+                            <th className="px-6 py-4 font-bold text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-kfintech-border/40">
@@ -203,29 +267,65 @@ const AdminDashboard = () => {
                                         {u.isActive ? 'ACTIVE' : 'INACTIVE'}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 text-right text-gray-500 text-xs font-mono">
-                                    {format(new Date(u.createdAt), 'MMM dd, yyyy')}
+                                <td className="px-6 py-4 text-right">
+                                    <button 
+                                        onClick={() => handleToggleUserStatus(u._id, u.isActive)}
+                                        className={`p-1.5 rounded-lg border transition-colors ${
+                                            u.isActive 
+                                                ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30' 
+                                                : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                        }`}
+                                        title={u.isActive ? "Deactivate User" : "Activate User"}
+                                    >
+                                        <Power className="w-4 h-4" />
+                                    </button>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
+            <Pagination />
         </div>
     );
 
     const renderTickets = (data) => (
-        <div className="glass-panel rounded-2xl border border-kfintech-border overflow-hidden">
-            <div className="p-4 border-b border-kfintech-border/50 bg-kfintech-card/50 flex justify-between items-center">
+        <div className="glass-panel rounded-2xl border border-kfintech-border overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-kfintech-border/50 bg-kfintech-card/50 flex flex-col md:flex-row justify-between items-center gap-4">
                 <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-blue-400" /> Ticket Queue
+                    <FileText className="w-5 h-5 text-blue-400" /> {activeTab === 'FLAGGED' ? 'Flagged Tickets' : 'Ticket Queue'}
                 </h2>
-                <button 
-                    onClick={handleExportCsv}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-kfintech-border hover:bg-kfintech-card/50 transition-colors text-xs font-bold text-gray-300"
-                >
-                    <Download className="w-4 h-4" /> Export CSV
-                </button>
+                <div className="flex flex-wrap gap-2">
+                    {activeTab === 'TICKETS' && (
+                        <>
+                            <select 
+                                value={ticketStatus} 
+                                onChange={(e) => setTicketStatus(e.target.value)}
+                                className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-kfintech-primary"
+                            >
+                                <option value="ALL">All Statuses</option>
+                                <option value="OPEN">Open</option>
+                                <option value="IN_PROGRESS">In Progress</option>
+                                <option value="RESOLVED">Resolved</option>
+                            </select>
+                            <select 
+                                value={dateRange} 
+                                onChange={(e) => setDateRange(e.target.value)}
+                                className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-kfintech-primary"
+                            >
+                                <option value="ALL">All Time</option>
+                                <option value="7d">Last 7 Days</option>
+                                <option value="30d">Last 30 Days</option>
+                            </select>
+                        </>
+                    )}
+                    <button 
+                        onClick={handleExportCsv}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 hover:bg-blue-500/20 transition-colors text-xs font-bold text-blue-400"
+                    >
+                        <Download className="w-4 h-4" /> Export CSV
+                    </button>
+                </div>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -243,7 +343,8 @@ const AdminDashboard = () => {
                             <tr key={t._id} className="hover:bg-kfintech-card/30 transition-colors">
                                 <td className="px-6 py-4 font-bold text-white">
                                     {t.investorName}
-                                    {t.isPotentialFraud && <span className="ml-2 text-xs px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded">FRAUD_FLAG</span>}
+                                    {t.isPotentialFraud && <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded border border-red-500/30">FRAUD_FLAG</span>}
+                                    {t.slaTimeline?.isBreached && <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded border border-orange-500/30">SLA_BREACH</span>}
                                 </td>
                                 <td className="px-6 py-4 text-gray-400 text-xs font-bold tracking-wide">{t.serviceType?.replace(/_/g, ' ')}</td>
                                 <td className="px-6 py-4">
@@ -276,6 +377,7 @@ const AdminDashboard = () => {
                     </tbody>
                 </table>
             </div>
+            {activeTab === 'TICKETS' && <Pagination />}
         </div>
     );
 

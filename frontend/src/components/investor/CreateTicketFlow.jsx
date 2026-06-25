@@ -252,7 +252,7 @@ const CreateTicketFlow = () => {
             payload.append('accountNumber', formData.accountNumber);
             payload.append('serviceType', selectedType);
             payload.append('serviceMetadata', JSON.stringify(serviceMetadata));
-            if (file) payload.append('file', file);
+            if (file) payload.append('documents', file);
 
             await apiClient.post('/tickets', payload, {
                 headers: { 'Content-Type': 'multipart/form-data' }

@@ -50,48 +50,10 @@ exports.createTicket = async (req, res) => {
 
     try {
         const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
-        
-        // --- A. FinBERT Sentiment ---
+        // User requested to ONLY run OCR on ticket submission to prevent timeouts.
+        // We will assign default values for sentiment and summary.
         let aiPayload = { priority: 'NORMAL', score: 0.5, fraud_alert: false };
-        try {
-            const aiResponse = await axios.post(`${mlServiceUrl}/sentiment/analyze`, { text: finalDescription });
-            aiPayload = aiResponse.data;
-        } catch (error) {
-            console.error("FinBERT Error:", error.message);
-        }
-
-        // --- B. Ollama Insight Summary ---
-        let aiSummary = [];
-        try {
-            const chatResponse = await axios.post(`${mlServiceUrl}/chatbot/ask`, { 
-                question: `Summarize this investor complaint into exactly 3 short bullet points. Provide the output ONLY as a JSON object with a single key "bullets" containing an array of exactly 3 strings. Example: {"bullets": ["point 1", "point 2", "point 3"]}. Do not include any other text. Complaint: ${finalDescription}`,
-                format: 'json'
-            });
-            const rawResponse = chatResponse.data.response;
-            
-            // Aggressive string cleanup to extract the actual sentences
-            // Find all substrings that look like sentences (ignoring JSON brackets/braces/keys)
-            const cleanedMatches = rawResponse.match(/(?:"|')([^"']{15,})(?:"|')/g);
-            
-            if (cleanedMatches && cleanedMatches.length > 0) {
-                aiSummary = cleanedMatches
-                    .map(s => s.replace(/["']/g, '').trim())
-                    .filter(s => !s.toLowerCase().includes("bullets") && s.length > 10);
-            } else {
-                // Absolute fallback: just strip all JSON chars
-                let stripped = rawResponse.replace(/[\*"{}\[\]\\]/g, '').replace(/bullets:/gi, '').trim();
-                aiSummary = stripped.split(',').map(s => s.trim()).filter(s => s.length > 5);
-            }
-                
-            // Truncate strictly to 3 bullets
-            if (aiSummary.length > 3) aiSummary = aiSummary.slice(0, 3);
-            if (aiSummary.length === 0) {
-                aiSummary = ["Requires manual review.", "AI summary extraction failed.", "Sentiment flags potential issue."];
-            }
-        } catch (error) {
-            console.error("Ollama Error:", error.message);
-            aiSummary = ["Ollama AI Engine not reachable.", "Using default static insights.", "Sentiment flags potential churn."];
-        }
+        let aiSummary = ["Pending AI Triage", "Awaiting Manual Review", "No summary available."];
 
         // --- C & D. Multi-Document S3 Upload & OCR ---
         const uploadedDocuments = [];
@@ -196,7 +158,7 @@ exports.createTicket = async (req, res) => {
             details: {
                 assignedPriority: newTicket.assignedPriority,
                 aiSentimentScore: newTicket.aiSentimentScore,
-                hasOCR: !!ocrExtractedText,
+                hasOCR: uploadedDocuments.some(doc => doc.ocrExtraction && doc.ocrExtraction.extractedText && !doc.ocrExtraction.extractedText.includes("skipped")),
                 isPotentialFraud: newTicket.isPotentialFraud,
                 note: 'Ticket created and initially triaged by AI.'
             }

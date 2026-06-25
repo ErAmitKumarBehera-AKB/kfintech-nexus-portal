@@ -52,7 +52,7 @@ const TicketDetail = ({ ticketId, onBack }) => {
             setResubmitting(true);
             try {
                 const formData = new FormData();
-                formData.append('document', resubmitFile);
+                formData.append('documents', resubmitFile);
                 await apiClient.post(`/tickets/${ticketId}/resubmit`, formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
@@ -119,7 +119,7 @@ const TicketDetail = ({ ticketId, onBack }) => {
                                 Deadline: {ticket.slaTimeline?.deadline ? format(new Date(ticket.slaTimeline.deadline), 'MMM dd, yyyy') : 'N/A'}
                             </div>
                         </div>
-                        <SLAProgressBar currentStatus={ticket.status} />
+                        <SLAProgressBar currentStatus={ticket.status} timeline={timeline} />
                     </div>
                 </div>
 
