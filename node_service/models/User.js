@@ -52,7 +52,10 @@ const UserSchema = new mongoose.Schema({
         street: String,
         city: String,
         state: String,
-        zip: String
+    },
+    refreshTokens: {
+        type: [String],
+        default: []
     }
 }, { timestamps: true });
 

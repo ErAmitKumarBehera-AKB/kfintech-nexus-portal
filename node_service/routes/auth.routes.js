@@ -20,7 +20,10 @@ router.post('/login', loginLimiter, authController.login);
 // GET /api/auth/me 
 router.get('/me', authenticate, authController.me);
 
+// POST /api/auth/refresh
+router.post('/refresh', authController.refresh);
+
 // POST /api/auth/logout
-router.post('/logout', authenticate, authController.logout);
+router.post('/logout', authController.logout);
 
 module.exports = router;

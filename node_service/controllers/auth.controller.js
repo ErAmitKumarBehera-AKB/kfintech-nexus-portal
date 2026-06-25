@@ -5,7 +5,21 @@ const { sendSMS } = require('../services/snsService');
 const { sendEmail } = require('../services/sesService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_dev_secret_kfintech_2026';
-const JWT_EXPIRES_IN = '8h';
+const JWT_EXPIRES_IN = '15m'; // Short-lived access token
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'fallback_refresh_secret_kfintech_2026';
+const JWT_REFRESH_EXPIRES_IN = '7d';
+
+const generateTokens = (user) => {
+    const payload = {
+        userId: user._id.toString(),
+        role: user.role,
+        name: user.name,
+        email: user.email
+    };
+    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    const refreshToken = jwt.sign({ userId: user._id.toString() }, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN });
+    return { accessToken, refreshToken };
+};
 
 const generateAndSendOTP = async (phoneNumberOrEmail) => {
     const otp = Math.floor(100000 + Math.random() * 900000);
@@ -58,18 +72,21 @@ exports.register = async (req, res) => {
 
         await newUser.save();
 
-        const payload = {
-            userId: newUser._id.toString(),
-            role: newUser.role,
-            name: newUser.name,
-            email: newUser.email
-        };
+        const { accessToken, refreshToken } = generateTokens(newUser);
+        
+        newUser.refreshTokens.push(refreshToken);
+        await newUser.save();
 
-        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        res.cookie('kfintech_refresh_token', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
 
         return res.status(201).json({
             message: 'Registration successful.',
-            accessToken: token,
+            accessToken,
             user: {
                 id: newUser._id,
                 name: newUser.name,
@@ -117,19 +134,21 @@ exports.login = async (req, res) => {
             console.warn('[OTP] Skipped OTP step:', otpErr.message);
         }
 
-        // 6. Issue RBAC JWT token
-        const payload = {
-            userId: user._id.toString(),
-            role: user.role,
-            name: user.name,
-            email: user.email
-        };
+        const { accessToken, refreshToken } = generateTokens(user);
+        
+        user.refreshTokens.push(refreshToken);
+        await user.save();
 
-        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        res.cookie('kfintech_refresh_token', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
 
         return res.status(200).json({
             message: 'Login successful.',
-            accessToken: token,
+            accessToken,
             user: {
                 id: user._id,
                 name: user.name,
@@ -165,6 +184,59 @@ exports.me = async (req, res) => {
         return res.status(500).json({ message: 'Internal server error.' });
     }
 };
+exports.refresh = async (req, res) => {
+    try {
+        const refreshToken = req.cookies.kfintech_refresh_token;
+        if (!refreshToken) {
+            return res.status(401).json({ message: 'Refresh token not found.' });
+        }
+
+        const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+        const user = await User.findById(decoded.userId);
+
+        if (!user || !user.isActive || !user.refreshTokens.includes(refreshToken)) {
+            return res.status(403).json({ message: 'Invalid refresh token.' });
+        }
+
+        // Rotate tokens
+        user.refreshTokens = user.refreshTokens.filter(rt => rt !== refreshToken);
+        const tokens = generateTokens(user);
+        
+        user.refreshTokens.push(tokens.refreshToken);
+        await user.save();
+
+        res.cookie('kfintech_refresh_token', tokens.refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
+        return res.status(200).json({
+            accessToken: tokens.accessToken
+        });
+
+    } catch (error) {
+        return res.status(403).json({ message: 'Refresh token expired or invalid.' });
+    }
+};
+
 exports.logout = async (req, res) => {
-    return res.status(200).json({ message: 'Logged out successfully.' });
+    try {
+        const refreshToken = req.cookies.kfintech_refresh_token;
+        if (refreshToken) {
+            const decoded = jwt.decode(refreshToken);
+            if (decoded && decoded.userId) {
+                await User.findByIdAndUpdate(decoded.userId, {
+                    $pull: { refreshTokens: refreshToken }
+                });
+            }
+        }
+        res.clearCookie('kfintech_refresh_token');
+        return res.status(200).json({ message: 'Logged out successfully.' });
+    } catch (error) {
+        console.error('[Auth] Logout error:', error);
+        res.clearCookie('kfintech_refresh_token');
+        return res.status(500).json({ message: 'Error during logout.' });
+    }
 };
