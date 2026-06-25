@@ -40,7 +40,7 @@ const DEMO_USERS = [
     },
     {
         _id: new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a02'),
-        name: 'Rahul Verma',
+        name: 'Ashutosh',
         email: 'l2agent@kfintech.com',
         phoneNumber: '+911234567892',
         role: 'ADMIN_L2',
@@ -48,7 +48,7 @@ const DEMO_USERS = [
     },
     {
         _id: new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a03'),
-        name: 'Ashutosh Kumar',
+        name: 'Soubhagya Pratik',
         email: 'admin@kfintech.com',
         phoneNumber: '+911234567893',
         role: 'ADMIN_SUPER',

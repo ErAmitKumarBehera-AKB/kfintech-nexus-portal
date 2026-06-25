@@ -62,17 +62,7 @@ services:
     networks:
       - kfintech-network
 
-  # Local Llama 3 AI Engine (CPU ONLY)
-  ollama:
-    image: ollama/ollama:latest
-    container_name: kfintech_ollama_cpu
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 10 && ollama pull llama3.2:1b && wait"]
-    networks:
-      - kfintech-network
+
 
   # AWS LocalStack
   localstack:
@@ -91,5 +81,5 @@ networks:
     driver: bridge
 
 volumes:
-  ollama_data:
+
   localstack_data:

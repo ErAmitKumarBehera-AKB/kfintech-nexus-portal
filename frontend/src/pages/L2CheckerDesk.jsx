@@ -77,6 +77,30 @@ const calculateSLA = (dateString, priority) => {
     return <span className="text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/30">{hours}h {mins}m remaining</span>;
 };
 
+const ConfidentialityScore = ({ score }) => {
+    // If no score is provided, use a default high confidence for demo purposes, 
+    // or calculate based on whether OCR was verified.
+    const percentage = score !== undefined && score !== null ? score : 94;
+    const isHighRisk = percentage < 70;
+    
+    return (
+        <div className="mt-5 pt-5 border-t border-kfintech-border/30">
+            <div className="flex justify-between text-xs mb-2 font-bold text-gray-400 uppercase tracking-wider items-center">
+                <span className="flex items-center gap-1"><ShieldCheck className="w-4 h-4" /> Data Confidentiality & Integrity</span>
+                <span className={isHighRisk ? 'text-amber-400 font-mono text-sm' : 'text-blue-400 font-mono text-sm'}>{percentage.toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-kfintech-bg/80 rounded-full h-3 overflow-hidden shadow-inner border border-kfintech-border/50">
+                <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${percentage}%` }}
+                    transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
+                    className={`h-full rounded-full shadow-[0_0_10px_currentColor] ${isHighRisk ? 'bg-amber-500 text-amber-500' : 'bg-blue-500 text-blue-500'}`} 
+                />
+            </div>
+        </div>
+    );
+};
+
 
 const L2CheckerDesk = () => {
     const [tickets, setTickets] = useState([]);
@@ -263,7 +287,9 @@ const L2CheckerDesk = () => {
                                             )}
                                         </ul>
                                         
+                                        
                                         <SentimentBar score={ticket.aiSentimentScore} />
+                                        <ConfidentialityScore score={ticket.ocrConfidenceScore || (ticket.ocrMatchVerified ? 98 : 45)} />
                                     </div>
                                 </div>
                                 <AnimatePresence>

@@ -17,14 +17,16 @@ from fastapi import FastAPI
 # pyrefly: ignore [missing-import]
 from .api import sentiment
 from .api import ocr
-from .api import chatbot
+from .api import summarize
+from .api import voice
 
 app = FastAPI(title="KFintech Nexus Portal AI Models API")
 
 # Include the routers
 app.include_router(sentiment.router, prefix="/sentiment", tags=["Sentiment"])
 app.include_router(ocr.router, prefix="/ocr", tags=["OCR Verification"])
-app.include_router(chatbot.router, prefix="/chatbot", tags=["RAG Chatbot"])
+app.include_router(summarize.router, prefix="/summarize", tags=["Summarize & AI Chat"])
+app.include_router(voice.router, prefix="/voice", tags=["Private Voice AI"])
 
 @app.get("/")
 def read_root():

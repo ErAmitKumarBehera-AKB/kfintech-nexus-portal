@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import apiClient from '../api/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Clock, ShieldAlert, Cpu, CheckCircle2, ChevronRight, FileText, XCircle, AlertTriangle } from 'lucide-react';
+import { Clock, ShieldAlert, Cpu, CheckCircle2, ChevronRight, FileText, XCircle, AlertTriangle, Upload } from 'lucide-react';
 import { getServiceType } from '../config/serviceTypes';
 
 const PriorityBadge = ({ priority }) => (
@@ -33,6 +33,7 @@ const L1MakerDesk = () => {
     const [notes, setNotes] = useState('');
     const [isOcrRunning, setIsOcrRunning] = useState(false);
     const [ocrResult, setOcrResult] = useState(null);
+    const [ocrFile, setOcrFile] = useState(null);
 
     useEffect(() => {
         const fetchQueue = async () => {
@@ -85,16 +86,38 @@ const L1MakerDesk = () => {
         return <span className="text-emerald-400">{hours}h {mins}m remaining</span>;
     };
 
-    const handleRunOCR = () => {
+    const handleRunOCR = async () => {
+        if (!ocrFile) {
+            alert('Please attach a document file before running OCR verification.');
+            return;
+        }
+        const accountNumber = selectedTicket?.accountNumber || selectedTicket?.serviceMetadata?.newAccountNumber || '000000';
         setIsOcrRunning(true);
         setOcrResult(null);
-        setTimeout(() => {
-            setIsOcrRunning(false);
-            setOcrResult({
-                matched: true,
-                extracted: "FOLIO: 123456789\nNAME: JOHN DOE\nSTATUS: ACTIVE"
+        try {
+            const formData = new FormData();
+            formData.append('account_number', accountNumber);
+            formData.append('file', ocrFile);
+            // Call the real FastAPI OCR endpoint (Florence-2 Vision OCR mock)
+            const res = await apiClient.post('/ocr/verify-account', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                baseURL: 'http://localhost:8000'
             });
-        }, 2000);
+            setOcrResult({
+                matched: res.data.account_found,
+                extracted: res.data.extracted_text?.join('\n') || 'No text extracted.',
+                message: res.data.message
+            });
+        } catch (err) {
+            console.error('OCR error:', err);
+            setOcrResult({
+                matched: false,
+                extracted: 'OCR request failed. Please check the backend connection.',
+                message: err.response?.data?.detail || err.message
+            });
+        } finally {
+            setIsOcrRunning(false);
+        }
     };
 
     const handleEscalate = async () => {
@@ -317,61 +340,101 @@ const L1MakerDesk = () => {
                                     <Cpu className="w-4 h-4" /> Secure Document Inspector
                                 </h4>
                                 <div className="flex gap-6">
-                                    
-                                    <div className="w-1/2 bg-kfintech-bg/50 rounded-xl border border-kfintech-border flex items-center justify-center p-8 relative overflow-hidden min-h-[300px] shadow-inner group">
+
+                                    {/* Left: Document upload drop zone */}
+                                    <div className="w-1/2 bg-kfintech-bg/50 rounded-xl border-2 border-dashed border-kfintech-border hover:border-kfintech-primary/50 flex items-center justify-center p-8 relative overflow-hidden min-h-[300px] shadow-inner group transition-colors">
                                         <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none transform -rotate-45">
                                             <span className="text-4xl font-black tracking-widest text-white">CONFIDENTIAL</span>
                                         </div>
-                                        <div className="text-center relative z-10 group-hover:scale-105 transition-transform">
-                                            <FileText className="w-16 h-16 text-gray-500 mx-auto mb-3" />
-                                            <p className="text-sm font-bold text-blue-300">{selectedTicket.documentName || "No document attached"}</p>
-                                            <p className="text-xs text-gray-500 mt-1">{selectedTicket.documentName ? "AES-256 Encrypted" : "OCR disabled"}</p>
-                                        </div>
+                                        <label className="text-center relative z-10 cursor-pointer flex flex-col items-center gap-3">
+                                            <input
+                                                type="file"
+                                                accept="image/*,application/pdf"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                    setOcrFile(e.target.files[0] || null);
+                                                    setOcrResult(null);
+                                                }}
+                                            />
+                                            {ocrFile ? (
+                                                <>
+                                                    <FileText className="w-14 h-14 text-kfintech-primary" />
+                                                    <p className="text-sm font-bold text-blue-300 break-all max-w-[160px]">{ocrFile.name}</p>
+                                                    <p className="text-xs text-emerald-400 font-bold">✓ Ready for OCR</p>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Upload className="w-14 h-14 text-gray-500 group-hover:text-kfintech-primary transition-colors" />
+                                                    <p className="text-sm font-bold text-gray-400 group-hover:text-white transition-colors">Click to upload document</p>
+                                                    <p className="text-xs text-gray-600">PNG, JPG, PDF supported</p>
+                                                    {selectedTicket.documentName && (
+                                                        <p className="text-xs text-blue-400 mt-1 font-mono">{selectedTicket.documentName}</p>
+                                                    )}
+                                                </>
+                                            )}
+                                        </label>
                                     </div>
 
+                                    {/* Right: OCR Engine panel */}
                                     <div className="w-1/2 flex flex-col">
                                         <div className="bg-kfintech-primary/5 p-6 rounded-xl border border-kfintech-primary/20 flex-grow shadow-inner">
-                                            <h5 className="font-extrabold text-blue-400 mb-3 flex items-center gap-2 text-lg">
-                                                <Cpu className="w-5 h-5" /> EasyOCR Engine
+                                            <h5 className="font-extrabold text-blue-400 mb-1 flex items-center gap-2 text-lg">
+                                                <Cpu className="w-5 h-5" /> Florence-2 Vision OCR
                                             </h5>
-                                            <p className="text-sm text-gray-400 mb-6 font-medium leading-relaxed">
-                                                Run Zero-Touch automated text extraction to verify the embedded account details against the CRM records.
+                                            <p className="text-[10px] font-mono text-gray-600 mb-3">microsoft/Florence-2-base · Mock Mode Active</p>
+                                            <p className="text-sm text-gray-400 mb-4 font-medium leading-relaxed">
+                                                Upload a bank statement or cheque image. The Vision OCR engine will extract all text and fuzzy-match the account number against CRM records.
                                             </p>
-                                            
-                                            <motion.button 
+
+                                            {/* Account number being verified */}
+                                            <div className="mb-4 bg-kfintech-bg p-3 rounded-lg border border-kfintech-border">
+                                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Verifying Account No.</p>
+                                                <p className="text-sm font-mono font-bold text-white">
+                                                    {selectedTicket.accountNumber ||
+                                                     selectedTicket.serviceMetadata?.newAccountNumber ||
+                                                     selectedTicket.serviceMetadata?.accountNumber ||
+                                                     <span className="text-gray-500">Not provided in ticket</span>}
+                                                </p>
+                                            </div>
+
+                                            <motion.button
                                                 whileHover={{ scale: 1.02 }}
                                                 whileTap={{ scale: 0.98 }}
-                                                onClick={() => {
-                                                    setIsOcrRunning(true);
-                                                    setTimeout(() => {
-                                                        setIsOcrRunning(false);
-                                                        setOcrResult({
-                                                            matched: selectedTicket.ocrMatchVerified || false,
-                                                            extracted: selectedTicket.ocrExtractedText || "No document attached or OCR processing failed."
-                                                        });
-                                                    }, 800);
-                                                }}
+                                                onClick={handleRunOCR}
                                                 disabled={isOcrRunning}
                                                 className={`w-full py-4 rounded-xl text-sm font-bold uppercase tracking-wider text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
                                                     isOcrRunning ? 'bg-kfintech-border cursor-wait text-gray-400' : 'bg-kfintech-primary hover:bg-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.6)]'
                                                 }`}
                                             >
                                                 {isOcrRunning ? (
-                                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Analyzing...</>
-                                                ) : 'Run AI Extraction'}
+                                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Running Vision OCR...</>
+                                                ) : (
+                                                    <><Cpu className="w-4 h-4" /> Run Vision OCR Extraction</>
+                                                )}
                                             </motion.button>
 
                                             <AnimatePresence>
                                                 {ocrResult && (
-                                                    <motion.div 
+                                                    <motion.div
                                                         initial={{ opacity: 0, y: 10 }}
                                                         animate={{ opacity: 1, y: 0 }}
-                                                        className={`mt-6 p-5 rounded-xl border shadow-inner ${ocrResult.matched ? 'bg-kfintech-accent/10 border-kfintech-accent/30' : 'bg-red-500/10 border-red-500/30'}`}
+                                                        className={`mt-4 p-4 rounded-xl border shadow-inner ${
+                                                            ocrResult.matched
+                                                                ? 'bg-kfintech-accent/10 border-kfintech-accent/30'
+                                                                : 'bg-red-500/10 border-red-500/30'
+                                                        }`}
                                                     >
-                                                        <div className={`flex items-center gap-2 font-bold mb-3 text-sm uppercase tracking-wider ${ocrResult.matched ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                            {ocrResult.matched ? <><CheckCircle2 className="w-5 h-5" /> CRM Match Verified</> : <><ShieldAlert className="w-5 h-5" /> Verification Failed</>}
+                                                        <div className={`flex items-center gap-2 font-bold mb-2 text-sm uppercase tracking-wider ${
+                                                            ocrResult.matched ? 'text-emerald-400' : 'text-red-400'
+                                                        }`}>
+                                                            {ocrResult.matched
+                                                                ? <><CheckCircle2 className="w-5 h-5" /> CRM Account Verified</>
+                                                                : <><ShieldAlert className="w-5 h-5" /> Verification Failed</>}
                                                         </div>
-                                                        <pre className="text-xs bg-kfintech-bg/80 p-3 rounded-lg text-gray-300 font-mono border border-kfintech-border shadow-inner leading-relaxed whitespace-pre-wrap">
+                                                        {ocrResult.message && (
+                                                            <p className="text-xs text-gray-400 mb-2 italic">{ocrResult.message}</p>
+                                                        )}
+                                                        <pre className="text-xs bg-kfintech-bg/80 p-3 rounded-lg text-gray-300 font-mono border border-kfintech-border shadow-inner leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">
                                                             {ocrResult.extracted}
                                                         </pre>
                                                     </motion.div>

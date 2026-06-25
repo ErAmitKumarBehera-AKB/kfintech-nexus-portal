@@ -16,4 +16,14 @@ router.put('/escalate/:id', authenticate, authorize('ADMIN_L1', 'ADMIN_SUPER'), 
 // L1 Maker desk and Super Admins can reject a ticket
 router.put('/reject/:id', authenticate, authorize('ADMIN_L1', 'ADMIN_SUPER'), adminController.rejectTicket);
 
+const superAdminController = require('../controllers/superadmin.controller');
+
+// Super Admin Only Routes
+router.get('/users', authenticate, authorize('ADMIN_SUPER'), superAdminController.getUsers);
+router.put('/users/:id/role', authenticate, authorize('ADMIN_SUPER'), superAdminController.changeUserRole);
+router.delete('/users/:id', authenticate, authorize('ADMIN_SUPER'), superAdminController.deleteUser);
+router.get('/audit-logs', authenticate, authorize('ADMIN_SUPER'), superAdminController.getAuditLogs);
+router.get('/system/health', authenticate, authorize('ADMIN_SUPER'), superAdminController.getSystemHealth);
+router.post('/revoke-all', authenticate, authorize('ADMIN_SUPER'), superAdminController.revokeAllSessions);
+
 module.exports = router;

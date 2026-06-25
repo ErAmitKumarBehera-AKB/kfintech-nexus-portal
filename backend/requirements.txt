@@ -2,8 +2,16 @@ fastapi
 uvicorn[standard]
 pydantic
 python-multipart
-transformers==4.38.2
+transformers>=4.43.0
+accelerate
+huggingface-hub
+openai-whisper
 
-easyocr
 requests
 numpy<2.0.0
+
+langchain
+langchain-community
+sentence-transformers
+chromadb
+

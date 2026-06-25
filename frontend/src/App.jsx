@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 import LoginPage from './pages/LoginPage';
 import InvestorDashboard from './pages/InvestorDashboard';
+import ChatbotWidget from './components/ChatbotWidget';
 import L1MakerDesk from './pages/L1MakerDesk';
 import L2CheckerDesk from './pages/L2CheckerDesk';
 import AdminDashboard from './pages/AdminDashboard';
@@ -83,6 +84,9 @@ const AppRoutes = () => {
                     />
                 </Routes>
             </main>
+            
+            {/* AI Assistant Chatbot (Only for Investors) */}
+            {isAuthenticated && user?.role === 'INVESTOR' && <ChatbotWidget />}
         </div>
     );
 };
