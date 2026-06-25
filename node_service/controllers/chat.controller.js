@@ -10,7 +10,8 @@ exports.askAssistant = async (req, res) => {
     try {
         // Proxy the request securely to the internal Python RAG Engine
         // This avoids exposing the raw Python microservice directly to the internet
-        const aiResponse = await axios.post('http://127.0.0.1:8000/chatbot/ask', {
+        const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
+        const aiResponse = await axios.post(`${mlServiceUrl}/chatbot/ask`, {
             question: question
         });
 
