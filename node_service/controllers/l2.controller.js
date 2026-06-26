@@ -79,6 +79,7 @@ exports.finalizeTicket = async (req, res) => {
 
         if (action === 'APPROVE') {
             newStatus = 'RESOLVED';
+            ticket.resolvedAt = new Date();
             
             // Phase 4: ACTUAL EXECUTION
             const user = await User.findById(ticket.investorId._id).session(session);

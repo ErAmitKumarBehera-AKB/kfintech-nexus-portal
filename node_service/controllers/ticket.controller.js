@@ -166,6 +166,7 @@ exports.getTickets = async (req, res) => {
         
         // Optional filters
         if (req.query.status) query.status = req.query.status;
+        if (req.query.serviceType) query.serviceType = req.query.serviceType;
 
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;

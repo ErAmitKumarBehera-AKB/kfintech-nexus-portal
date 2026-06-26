@@ -117,6 +117,9 @@ const TicketSchema = new mongoose.Schema({
         type: String,
         enum: ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'L1_REVIEW', 'L2_APPROVAL', 'APPROVED', 'REJECTED', 'ON_HOLD'],
         default: 'OPEN'
+    },
+    resolvedAt: {
+        type: Date
     }
 }, { timestamps: true });
 

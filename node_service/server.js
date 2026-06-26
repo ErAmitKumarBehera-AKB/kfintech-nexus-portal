@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const cookieParser = require('cookie-parser');
+const { startAutoCloseJob } = require('./services/autoCloseService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -59,6 +60,11 @@ mongoose.connect(MONGODB_URI)
             
             // 2. Initialize AWS LocalStack (S3 Bucket, SES Verification)
             require('./test_localstack');
+
+            console.log('✅ System dependencies initialized.');
+            
+            // Start Background Jobs
+            startAutoCloseJob();
             
         } catch (initErr) {
             console.log('⚠️ Non-critical warning during initialization:', initErr.message);

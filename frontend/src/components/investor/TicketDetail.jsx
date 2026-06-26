@@ -16,7 +16,7 @@ const TicketDetail = ({ ticketId, onBack }) => {
     const [resubmitting, setResubmitting] = useState(false);
 
     useEffect(() => {
-        const fetchTicketDetails = async () => {
+        const fetchTicketDetails = async (isBackground = false) => {
             try {
                 const response = await apiClient.get(`/tickets/${ticketId}`);
                 setTicket(response.data.ticket);
@@ -24,11 +24,20 @@ const TicketDetail = ({ ticketId, onBack }) => {
             } catch (error) {
                 console.error('Failed to fetch ticket:', error);
             } finally {
-                setIsLoading(false);
+                if (!isBackground) setIsLoading(false);
             }
         };
 
-        const handleAddComment = async (e) => {
+        if (ticketId) {
+            fetchTicketDetails();
+            const intervalId = setInterval(() => {
+                fetchTicketDetails(true);
+            }, 5000);
+            return () => clearInterval(intervalId);
+        }
+    }, [ticketId]);
+
+    const handleAddComment = async (e) => {
             e.preventDefault();
             if (!newComment.trim()) return;
             setSubmittingComment(true);
@@ -67,9 +76,6 @@ const TicketDetail = ({ ticketId, onBack }) => {
                 setResubmitting(false);
             }
         };
-
-        if (ticketId) fetchTicketDetails();
-    }, [ticketId]);
 
     if (isLoading) {
         return <div className="flex justify-center items-center h-full"><div className="animate-spin w-8 h-8 border-2 border-kfintech-primary border-t-transparent rounded-full" /></div>;

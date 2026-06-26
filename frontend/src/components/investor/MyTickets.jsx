@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../../api/client';
 import { Clock, Search, Filter } from 'lucide-react';
 import { format } from 'date-fns';
+import { SERVICE_TYPE_LIST } from '../../config/serviceTypes';
 
 const MyTickets = ({ onSelectTicket }) => {
     const [tickets, setTickets] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState('ALL');
+    const [serviceFilter, setServiceFilter] = useState('ALL');
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
 
@@ -14,7 +16,10 @@ const MyTickets = ({ onSelectTicket }) => {
         const fetchTickets = async () => {
             setIsLoading(true);
             try {
-                const response = await apiClient.get(`/tickets?page=${page}&limit=10${filter !== 'ALL' ? `&status=${filter}` : ''}`);
+                let url = `/tickets?page=${page}&limit=10`;
+                if (filter !== 'ALL') url += `&status=${filter}`;
+                if (serviceFilter !== 'ALL') url += `&serviceType=${serviceFilter}`;
+                const response = await apiClient.get(url);
                 setTickets(response.data.tickets || []);
                 setTotalPages(response.data.pagination?.pages || 1);
             } catch (error) {
@@ -25,7 +30,7 @@ const MyTickets = ({ onSelectTicket }) => {
         };
 
         fetchTickets();
-    }, [page, filter]);
+    }, [page, filter, serviceFilter]);
 
     const filteredTickets = tickets; // Filtering is now handled backend-side via API call
 
@@ -74,6 +79,16 @@ const MyTickets = ({ onSelectTicket }) => {
                         <option value="RESOLVED">Resolved</option>
                         <option value="CLOSED">Closed</option>
                     </select>
+                    <select 
+                        value={serviceFilter} 
+                        onChange={(e) => { setServiceFilter(e.target.value); setPage(1); }}
+                        className="bg-kfintech-card border border-kfintech-border rounded-lg px-4 py-2 text-sm text-white cursor-pointer"
+                    >
+                        <option value="ALL">All Services</option>
+                        {SERVICE_TYPE_LIST.map(st => (
+                            <option key={st.id} value={st.id}>{st.label}</option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
@@ -92,6 +107,15 @@ const MyTickets = ({ onSelectTicket }) => {
                                         <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${getStatusColor(ticket.status)}`}>
                                             {ticket.status.replace('_', ' ')}
                                         </span>
+                                        {ticket.assignedPriority && (
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${
+                                                ticket.assignedPriority === 'CRITICAL' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
+                                                ticket.assignedPriority === 'HIGH' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 
+                                                'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                            }`}>
+                                                {ticket.assignedPriority}
+                                            </span>
+                                        )}
                                     </div>
                                     <h3 className="text-white font-bold text-lg group-hover:text-kfintech-primary transition-colors">{ticket.title || ticket.serviceType}</h3>
                                     <p className="text-gray-400 text-sm mt-1 line-clamp-1">{ticket.description}</p>

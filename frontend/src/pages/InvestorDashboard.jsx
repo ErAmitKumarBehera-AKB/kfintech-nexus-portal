@@ -3,6 +3,7 @@ import Sidebar from '../components/common/Sidebar';
 import MyTickets from '../components/investor/MyTickets';
 import CreateTicketFlow from '../components/investor/CreateTicketFlow';
 import TicketDetail from '../components/investor/TicketDetail';
+import Profile from '../components/investor/Profile';
 
 const InvestorDashboard = () => {
     const [activeTab, setActiveTab] = useState('tickets'); // 'tickets' or 'create'
@@ -23,6 +24,8 @@ const InvestorDashboard = () => {
                 return <MyTickets onSelectTicket={setSelectedTicketId} />;
             case 'create':
                 return <CreateTicketFlow />;
+            case 'profile':
+                return <Profile />;
             default:
                 return <MyTickets onSelectTicket={setSelectedTicketId} />;
         }

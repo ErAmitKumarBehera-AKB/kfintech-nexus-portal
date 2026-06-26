@@ -34,15 +34,24 @@ const Sidebar = ({ activeTab, onTabChange }) => {
             </div>
             
             <div className="mt-auto px-6 pb-6">
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-kfintech-bg border border-kfintech-border">
-                    <div className="w-8 h-8 rounded-full bg-kfintech-primary/20 flex items-center justify-center text-kfintech-primary">
+                <button 
+                    onClick={() => onTabChange('profile')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
+                        activeTab === 'profile'
+                            ? 'bg-kfintech-primary/10 border-kfintech-primary/30'
+                            : 'bg-kfintech-bg border-kfintech-border hover:border-kfintech-primary/50'
+                    }`}
+                >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        activeTab === 'profile' ? 'bg-kfintech-primary text-white shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'bg-kfintech-primary/20 text-kfintech-primary'
+                    }`}>
                         <User className="w-4 h-4" />
                     </div>
                     <div>
-                        <p className="text-sm font-bold text-white">Profile</p>
-                        <p className="text-xs text-gray-500">KYC Verified</p>
+                        <p className={`text-sm font-bold ${activeTab === 'profile' ? 'text-kfintech-primary' : 'text-white'}`}>Profile</p>
+                        <p className="text-xs text-gray-500">Settings & KYC</p>
                     </div>
-                </div>
+                </button>
             </div>
         </div>
     );
