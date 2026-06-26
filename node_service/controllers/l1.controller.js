@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Ticket = require('../models/Ticket');
 const AuditLog = require('../models/AuditLog');
 const { getServiceConfig } = require('../utils/serviceTypes');
+const notificationService = require('../services/notificationService');
 
 exports.getL1Queue = async (req, res) => {
     try {
@@ -205,6 +206,15 @@ exports.escalateTicket = async (req, res) => {
             });
             await auditLog.save({ session });
 
+            await notificationService.createNotification({
+                userId: ticket.investorId,
+                ticketId: ticket._id,
+                type: 'STATUS_CHANGED',
+                title: 'Ticket Escalated',
+                message: `Your ticket has been verified and moved to L2 Review.`,
+                channels: { inApp: true, email: true }
+            }, { session });
+
             await session.commitTransaction();
             session.endSession();
 
@@ -257,6 +267,15 @@ exports.rejectTicket = async (req, res) => {
                 }
             });
             await auditLog.save({ session });
+
+            await notificationService.createNotification({
+                userId: ticket.investorId,
+                ticketId: ticket._id,
+                type: 'DOCUMENT_REJECTED',
+                title: 'Action Required: Revision Needed',
+                message: `L1 Admin: ${reason}`,
+                channels: { inApp: true, email: true }
+            }, { session });
 
             await session.commitTransaction();
             session.endSession();

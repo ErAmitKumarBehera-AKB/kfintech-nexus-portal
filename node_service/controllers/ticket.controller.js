@@ -3,6 +3,7 @@ const axios = require('axios');
 const Ticket = require('../models/Ticket');
 const AuditLog = require('../models/AuditLog');
 const { getServiceConfig, buildSlaTimeline } = require('../utils/serviceTypes');
+const notificationService = require('../services/notificationService');
 
 const FormData = require('form-data');
 const { v4: uuidv4 } = require("uuid");
@@ -143,6 +144,16 @@ exports.createTicket = async (req, res) => {
         });
 
         await auditLog.save({ session });
+
+        // Trigger Notification
+        await notificationService.createNotification({
+            userId: investorId,
+            ticketId: newTicket._id,
+            type: 'TICKET_CREATED',
+            title: 'Ticket Created',
+            message: `Your ticket has been successfully submitted and is under review.`,
+            channels: { inApp: true, email: true }
+        }, { session });
 
         await session.commitTransaction();
         session.endSession();

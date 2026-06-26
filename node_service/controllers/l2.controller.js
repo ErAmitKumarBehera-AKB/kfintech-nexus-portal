@@ -4,6 +4,7 @@ const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
 const { sendEmail } = require('../services/sesService');
 const { sendSMS } = require('../services/snsService');
+const notificationService = require('../services/notificationService');
 
 exports.getL2Queue = async (req, res) => {
     try {
@@ -174,35 +175,27 @@ exports.finalizeTicket = async (req, res) => {
         await session.commitTransaction();
         session.endSession();
 
-        // 6. Send Notifications via LocalStack SES/SNS
+        // 6. Send Notifications
         try {
             const investor = ticket.investorId;
-            const userEmail = investor ? investor.email : null;
-            const userPhone = investor ? investor.phoneNumber : null;
             const msgStatus = action === 'APPROVE' ? 'APPROVED and RESOLVED'
                             : action === 'REJECT'  ? 'REJECTED'
                             :                        'returned to L1 for rework';
             
-            const subject = `Update on your Ticket: ${ticketId}`;
-            const htmlMessage = `<h1>Hello ${ticket.investorName},</h1><p>Your ticket has been <strong>${msgStatus}</strong> by our L2 team.</p>`;
-            const textMessage = `Hello ${ticket.investorName}, your ticket ${ticketId} has been ${msgStatus}.`;
-
-            if (userEmail) {
-                await sendEmail({
-                    to: userEmail,
-                    subject: subject,
-                    message: htmlMessage
-                });
-            }
-
-            if (userPhone) {
-                await sendSMS({
-                    phoneNumber: userPhone,
-                    message: textMessage
-                });
-            }
+            const notificationType = action === 'APPROVE' ? 'TICKET_RESOLVED'
+                                   : action === 'REJECT' ? 'TICKET_REJECTED'
+                                   : 'RETURNED_TO_L1';
+            
+            await notificationService.createNotification({
+                userId: investor ? investor._id : ticket.investorId,
+                ticketId: ticket._id,
+                type: notificationType,
+                title: `Ticket ${action === 'APPROVE' ? 'Resolved' : action === 'REJECT' ? 'Rejected' : 'Update'}`,
+                message: `Your ticket has been ${msgStatus} by our L2 team.`,
+                channels: { inApp: true, email: true }
+            });
         } catch (notificationError) {
-            console.error("Non-critical error sending mock notification via LocalStack:", notificationError);
+            console.error("Non-critical error sending notification:", notificationError);
         }
 
         return res.status(200).json({

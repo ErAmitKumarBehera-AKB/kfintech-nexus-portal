@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { LayoutDashboard, PlusCircle, User } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 const Sidebar = ({ activeTab, onTabChange }) => {
     return (
@@ -34,6 +35,11 @@ const Sidebar = ({ activeTab, onTabChange }) => {
             </div>
             
             <div className="mt-auto px-6 pb-6">
+                <div className="flex items-center justify-between mb-4">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Alerts</p>
+                    <NotificationBell />
+                </div>
+                
                 <button 
                     onClick={() => onTabChange('profile')}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
