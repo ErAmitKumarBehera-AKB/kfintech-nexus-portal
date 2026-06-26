@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 from app.models.schemas import ChatRequest, ChatResponse
 from app.services.rag_service import query_context
-from app.services.sentiment_service import analyze_complaint_text
 from app.services.llm_service import query_llm
 
 router = APIRouter()
@@ -11,20 +10,16 @@ async def ask_chatbot(request: ChatRequest):
     # 1. Retrieval
     context_str, sources = query_context(request.question)
     
-    # 2. Add Ticket Context
-    if request.ticket_context:
-        context_str += f"\n\nUSER'S ACTIVE TICKETS (Use this if they ask for status):\n{request.ticket_context}"
-        sources.append("User's Live Ticket Data")
-        
-    # 3. Sentiment Analysis
-    sentiment, _, _, fraud_alert = analyze_complaint_text(request.question)
+    # No ticket context for now, keep it strictly FAQ RAG-based.
     
     # 4. Prompt Construction
     system_prompt = (
-        "You are Nexus, a friendly and professional KFintech compliance assistant. "
-        "If the user greets you (e.g. 'hi', 'hello', 'hlo'), greet them back and ask how you can help. "
+        "You are Finora Assist, a professional, reassuring, efficient, and trustworthy AI assistant for KFintech. "
+        "Your tone must be clear and concise, and you must always provide timelines and next steps when applicable.\n"
+        "If this is a first visit or a greeting (e.g., 'hi', 'hello'), you MUST reply with EXACTLY this greeting format:\n"
+        "'Welcome to Finora Assist.\nI can help with:\n- FAQs for now'\n\n"
         "If they ask a specific question, answer it ONLY using the provided context. "
-        "If the specific answer is not in the context, politely say 'I do not have that information.' "
+        "If the specific answer is not in the context, politely say 'I do not have that information at this time.' "
         "Do not hallucinate policies."
     )
     if context_str:
@@ -33,22 +28,20 @@ async def ask_chatbot(request: ChatRequest):
     history_str = ""
     if request.history:
         history_str = "CHAT HISTORY:\n"
+        # Only process last 4 messages to save tokens
         for msg in request.history[-4:]:
-            history_str += f"{'User' if msg['type'] == 'user' else 'Nexus'}: {msg['text']}\n"
+            history_str += f"{'User' if msg['type'] == 'user' else 'Finora Assist'}: {msg['text']}\n"
     
-    full_prompt = f"{system_prompt}\n{history_str}\nUser: {request.question}\nNexus:"
+    full_prompt = f"{system_prompt}\n{history_str}\nUser: {request.question}\nFinora Assist:"
     
     # 5. LLM Call
     llm_response = await query_llm(full_prompt)
     
-    if not sources and not request.ticket_context:
-        # Don't add a fake source if there genuinely are no sources and it's just a greeting.
-        pass
-        
     return ChatResponse(
         query=request.question,
         response=llm_response,
         retrieved_data_source=sources,
-        sentiment=sentiment,
-        fraud_alert=fraud_alert
+        sentiment="NEUTRAL",
+        fraud_alert=False
     )
+

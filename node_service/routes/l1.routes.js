@@ -27,4 +27,8 @@ router.post('/tickets/:id/reject', authenticate, authorize('ADMIN_L1', 'ADMIN_SU
 // Hold for investigation
 router.post('/tickets/:id/hold', authenticate, authorize('ADMIN_L1', 'ADMIN_SUPER'), l1Controller.holdTicket);
 
+// Route: POST /api/l1/tickets/:id/summarize
+// Generate AI summary for the ticket
+router.post('/tickets/:id/summarize', authenticate, authorize('ADMIN_L1', 'ADMIN_SUPER'), l1Controller.summarizeTicket);
+
 module.exports = router;

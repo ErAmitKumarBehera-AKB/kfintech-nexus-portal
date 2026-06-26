@@ -30,7 +30,7 @@ exports.verifyInvestorDocument = async (req, res) => {
         // 3. Prepare payload for Python AI Microservice
         const formData = new FormData();
         formData.append('account_number', accountNumber);
-        formData.append('file', file.buffer, {
+        formData.append('files', file.buffer, {
             filename: file.originalname,
             contentType: file.mimetype
         });

@@ -51,10 +51,20 @@ exports.createTicket = async (req, res) => {
 
     try {
         const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
-        // User requested to ONLY run OCR on ticket submission to prevent timeouts.
-        // We will assign default values for sentiment and summary.
         let aiPayload = { priority: 'NORMAL', score: 0.5, fraud_alert: false };
-        let aiSummary = ["Pending AI Triage", "Awaiting Manual Review", "No summary available."];
+        let aiSummary = [];
+        
+        // Only run sentiment analysis for COMPLAINT tickets
+        if (serviceType === 'COMPLAINT') {
+            try {
+                const sentimentRes = await axios.post(`${mlServiceUrl}/sentiment/analyze`, {
+                    text: title + " " + finalDescription
+                });
+                aiPayload = sentimentRes.data;
+            } catch (err) {
+                console.error("Sentiment API failed:", err.message);
+            }
+        }
 
         // --- C & D. Multi-Document S3 Upload & OCR ---
         const uploadedDocuments = [];
@@ -386,7 +396,7 @@ exports.runOcr = async (req, res) => {
         let fileBuffer;
         try {
             const s3Response = await axios.get(document.s3Key, { responseType: 'arraybuffer' });
-            fileBuffer = s3Response.data;
+            fileBuffer = Buffer.from(s3Response.data);
         } catch (error) {
             console.error("Error downloading file from S3 for OCR:", error.message);
             return res.status(500).json({ message: "Failed to fetch document from storage." });
@@ -399,7 +409,7 @@ exports.runOcr = async (req, res) => {
         try {
             const formData = new FormData();
             formData.append('account_number', ticket.accountNumber || "");
-            formData.append('file', fileBuffer, {
+            formData.append('files', fileBuffer, {
                 filename: document.name,
                 contentType: document.fileType,
             });

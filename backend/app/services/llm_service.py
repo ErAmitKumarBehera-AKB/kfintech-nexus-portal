@@ -24,8 +24,8 @@ def query_gemini(prompt: str) -> str:
 async def query_llm(full_prompt: str) -> str:
     llm_response = ""
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post("http://localhost:11434/api/generate", json={
+        async with httpx.AsyncClient(timeout=10.0) as http_client:
+            response = await http_client.post("http://localhost:11434/api/generate", json={
                 "model": "llama3.2:1b",
                 "prompt": full_prompt,
                 "stream": False
@@ -38,3 +38,27 @@ async def query_llm(full_prompt: str) -> str:
         llm_response = query_gemini(full_prompt)
         
     return llm_response
+
+async def summarize_ticket(ticket_data_str: str) -> list[str]:
+    system_prompt = (
+        "You are an AI assistant for KFintech Nexus Portal. Your task is to summarize the following "
+        "ticket data into 3 concise bullet points. Return ONLY a JSON array of strings, with no other text."
+    )
+    full_prompt = f"{system_prompt}\n\nTICKET DATA:\n{ticket_data_str}"
+    
+    response_text = await query_llm(full_prompt)
+    
+    import json
+    import re
+    try:
+        # Extract JSON array from response (in case of markdown blocks)
+        match = re.search(r'\[.*\]', response_text.replace('\n', ''))
+        if match:
+            bullets = json.loads(match.group(0))
+            if isinstance(bullets, list):
+                return bullets
+    except Exception as e:
+        print(f"Summarizer failed to parse JSON array: {e}")
+        
+    # Fallback if it fails to generate strict JSON
+    return ["AI Summary generation failed", "Check ticket details manually", response_text[:100]]

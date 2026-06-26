@@ -23,18 +23,7 @@ exports.askAssistant = async (req, res) => {
     }
 
     try {
-        // 1. Fetch user's active tickets to provide as context
-        const activeTickets = await Ticket.find({ 
-            investor: req.user.id,
-            status: { $nin: ['CLOSED', 'RESOLVED'] }
-        }).sort({ createdAt: -1 });
-
-        let ticketContext = "";
-        if (activeTickets.length > 0) {
-            ticketContext = activeTickets.map(t => 
-                `Ticket ID: ${t._id}\nService Type: ${t.serviceType}\nStatus: ${t.status}\nPriority: ${t.assignedPriority}\nCreated At: ${t.createdAt}`
-            ).join('\n\n');
-        }
+        // 1. (Removed Ticket Context - strict RAG FAQ only)
 
         // 2. Fetch or create chat session
         let session = await ChatSession.findOne({ userId: req.user.id });
@@ -61,7 +50,6 @@ exports.askAssistant = async (req, res) => {
         const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
         const aiResponse = await axios.post(`${mlServiceUrl}/chatbot/ask`, {
             question: question,
-            ticket_context: ticketContext,
             history: historyForMl
         });
 

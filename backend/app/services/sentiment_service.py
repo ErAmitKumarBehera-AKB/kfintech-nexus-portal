@@ -10,6 +10,18 @@ except Exception as e:
     sentiment_analyzer = None
     print(f"Failed to load transformer model: {e}")
 
+def classify_intent(text: str) -> str:
+    text_lower = text.lower()
+    if any(k in text_lower for k in ["scam", "fraud", "hacked", "stolen", "unauthorized", "theft"]):
+        return "FRAUD_REPORT"
+    if any(k in text_lower for k in ["update", "change", "modify", "correct"]):
+        return "UPDATE_REQUEST"
+    if any(k in text_lower for k in ["why", "how", "when", "what", "where", "status"]):
+        return "INQUIRY"
+    if any(k in text_lower for k in ["cancel", "stop", "close"]):
+        return "CANCELLATION"
+    return "COMPLAINT"
+
 def get_sentiment(text: str):
     fraud_keywords = ["scam", "fraud", "hacked", "stolen", "unauthorized", "theft"]
     fraud_alert = any(keyword in text.lower() for keyword in fraud_keywords)
@@ -17,19 +29,12 @@ def get_sentiment(text: str):
     
     if sentiment_analyzer:
         try:
-            result = sentiment_analyzer(text)[0]
+            result = sentiment_analyzer(text[:512])[0] # Truncate to avoid length errors
             label = result['label'].upper()
             confidence = result['score']
             
-            if label == "NEGATIVE":
-                score = confidence
-                if any(keyword in text.lower() for keyword in severe_keywords) or fraud_alert:
-                    score = min(1.0, score + 0.3)
-                return "NEGATIVE", score, fraud_alert
-            elif label == "POSITIVE":
-                return "POSITIVE", 1.0 - confidence, fraud_alert
-            else:
-                return "NEUTRAL", 0.5, fraud_alert
+            # Use exact scores instead of manipulating them
+            return label, confidence, fraud_alert
         except Exception:
             pass
             
@@ -40,9 +45,19 @@ def get_sentiment(text: str):
         
     if negative_count > 0:
         return "NEGATIVE", min(1.0, 0.7 + (negative_count * 0.1)), fraud_alert
-    return "POSITIVE", 0.1, fraud_alert
+    return "POSITIVE", 0.9, fraud_alert
 
 def analyze_complaint_text(text: str):
     sentiment, score, fraud_alert = get_sentiment(text)
-    priority = "CRITICAL" if score > 0.75 or fraud_alert else "NORMAL"
-    return sentiment, round(score, 4), priority, fraud_alert
+    intent = classify_intent(text)
+    
+    # Escalation Logic based on Sentiment & Intent
+    priority = "NORMAL"
+    
+    # Only escalate based on score if the sentiment is NEGATIVE
+    if fraud_alert or intent == "FRAUD_REPORT" or (sentiment == "NEGATIVE" and score > 0.85):
+        priority = "CRITICAL"
+    elif sentiment == "NEGATIVE" and score > 0.60:
+        priority = "HIGH"
+    
+    return sentiment, round(score, 4), priority, fraud_alert, intent

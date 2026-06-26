@@ -3,6 +3,7 @@ const Ticket = require('../models/Ticket');
 const AuditLog = require('../models/AuditLog');
 const { getServiceConfig } = require('../utils/serviceTypes');
 const notificationService = require('../services/notificationService');
+const axios = require('axios');
 
 exports.getL1Queue = async (req, res) => {
     try {
@@ -338,5 +339,33 @@ exports.holdTicket = async (req, res) => {
     } catch (error) {
         console.error("Hold error:", error);
         res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+exports.summarizeTicket = async (req, res) => {
+    try {
+        const ticketId = req.params.id;
+        const ticket = await Ticket.findById(ticketId);
+        if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+
+        // Call Python AI Engine
+        const aiResponse = await axios.post('http://127.0.0.1:8000/summarize/ticket', {
+            ticket_data: {
+                title: ticket.title,
+                description: ticket.description,
+                serviceType: ticket.serviceType,
+                metadata: ticket.serviceMetadata
+            }
+        });
+
+        const summaryBullets = aiResponse.data.summary;
+        
+        ticket.aiSummary = summaryBullets;
+        await ticket.save();
+
+        return res.status(200).json({ message: "Summary generated", summary: summaryBullets });
+    } catch (error) {
+        console.error("Summarizer proxy error:", error);
+        res.status(500).json({ message: "Failed to generate summary from AI engine" });
     }
 };

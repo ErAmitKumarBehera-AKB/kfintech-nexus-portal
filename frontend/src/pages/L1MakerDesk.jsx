@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import apiClient from '../api/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Clock, ShieldAlert, Cpu, CheckCircle2, ChevronRight, FileText, XCircle, AlertTriangle } from 'lucide-react';
+import { Clock, ShieldAlert, Cpu, CheckCircle2, ChevronRight, FileText, XCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { getServiceType } from '../config/serviceTypes';
 
 const PriorityBadge = ({ priority }) => (
@@ -32,6 +32,7 @@ const L1MakerDesk = () => {
     const [loading, setLoading] = useState(true);
     const [notes, setNotes] = useState('');
     const [runningOcr, setRunningOcr] = useState(null);
+    const [loadingSummary, setLoadingSummary] = useState(false);
     
     // Filtering State
     const [filterStatus, setFilterStatus] = useState('ALL');
@@ -158,6 +159,20 @@ const L1MakerDesk = () => {
             setNotes('');
         } catch (error) {
             alert(`Hold failed: ${error.response?.data?.message || error.message}`);
+        }
+    };
+
+    const handleSummarize = async () => {
+        if (!selectedTicket || !selectedTicket._id) return;
+        setLoadingSummary(true);
+        try {
+            const res = await apiClient.post(`/l1/tickets/${selectedTicket._id}/summarize`);
+            setSelectedTicket(prev => ({ ...prev, aiSummary: res.data.summary }));
+        } catch (error) {
+            console.error("Summary error:", error);
+            alert("Failed to generate AI Summary");
+        } finally {
+            setLoadingSummary(false);
         }
     };
 
@@ -385,6 +400,36 @@ const L1MakerDesk = () => {
                                             </div>
                                         );
                                     })()}
+                                    
+                                    {/* AI Summary Section */}
+                                    <div className="mt-4 p-4 bg-kfintech-primary/10 rounded-xl border border-kfintech-primary/30 shadow-[0_0_15px_rgba(59,130,246,0.05)] relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-1 h-full bg-kfintech-primary"></div>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h4 className="text-xs font-bold text-kfintech-primary uppercase tracking-widest flex items-center gap-2">
+                                                <Sparkles className="w-4 h-4" /> AI Ticket Summary
+                                            </h4>
+                                            {(!selectedTicket.aiSummary || selectedTicket.aiSummary.length === 0 || selectedTicket.aiSummary[0] === 'Pending AI Triage') && (
+                                                <button 
+                                                    onClick={handleSummarize}
+                                                    disabled={loadingSummary}
+                                                    className="px-3 py-1 bg-kfintech-primary/20 hover:bg-kfintech-primary/40 text-kfintech-primary text-xs font-bold uppercase rounded border border-kfintech-primary/50 transition-colors disabled:opacity-50 flex items-center gap-1"
+                                                >
+                                                    {loadingSummary ? <Cpu className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                                    {loadingSummary ? 'Generating...' : 'Generate Summary'}
+                                                </button>
+                                            )}
+                                        </div>
+                                        
+                                        {selectedTicket.aiSummary && selectedTicket.aiSummary.length > 0 && selectedTicket.aiSummary[0] !== 'Pending AI Triage' ? (
+                                            <ul className="list-disc pl-5 space-y-1 text-sm text-gray-200">
+                                                {selectedTicket.aiSummary.map((bullet, idx) => (
+                                                    <li key={idx} className="font-medium">{bullet}</li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            !loadingSummary && <p className="text-sm text-gray-400 italic">No summary generated yet.</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 

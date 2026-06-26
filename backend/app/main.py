@@ -17,7 +17,7 @@ if platform.system() == "Windows":
         pass
 
 from fastapi import FastAPI
-from app.routes import sentiment, ocr, chatbot, health
+from app.routes import sentiment, ocr, chatbot, health, summarizer
 
 app = FastAPI(title="KFintech Nexus Portal AI Models API")
 
@@ -25,6 +25,7 @@ app = FastAPI(title="KFintech Nexus Portal AI Models API")
 app.include_router(sentiment.router, prefix="/sentiment", tags=["Sentiment"])
 app.include_router(ocr.router, prefix="/ocr", tags=["OCR Verification"])
 app.include_router(chatbot.router, prefix="/chatbot", tags=["RAG Chatbot"])
+app.include_router(summarizer.router, prefix="/summarize", tags=["Summarizer"])
 app.include_router(health.router, prefix="/health", tags=["Health"])
 
 @app.get("/")
