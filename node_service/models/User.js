@@ -56,7 +56,11 @@ const UserSchema = new mongoose.Schema({
     refreshTokens: {
         type: [String],
         default: []
-    }
+    },
+    resetPasswordToken: String,
+    resetPasswordExpires: Date,
+    otpCode: String,
+    otpExpires: Date
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);

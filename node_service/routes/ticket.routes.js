@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const ticketController = require('../controllers/ticket.controller');
 const upload = require('../middleware/upload');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth.middleware');
 
 // Route: POST /api/tickets
 // Only authenticated Investors (and Admins) can lodge tickets

@@ -1,34 +1,44 @@
-import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Eye, EyeOff, LogIn, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const DEMO_CREDENTIALS = [
-    { email: 'investor@kfintech.com', role: 'INVESTOR', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30' },
-    { email: 'l1agent@kfintech.com',  role: 'ADMIN_L1',    color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30' },
-    { email: 'l2agent@kfintech.com',  role: 'ADMIN_L2',    color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/30' },
-    { email: 'admin@kfintech.com',    role: 'ADMIN_SUPER',  color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30' },
+    { email: 'investor@kfintech.com', role: 'INVESTOR' },
+    { email: 'l1agent@kfintech.com',  role: 'ADMIN_L1' },
+    { email: 'l2agent@kfintech.com',  role: 'ADMIN_L2' },
+    { email: 'admin@kfintech.com',    role: 'ADMIN_SUPER' },
 ];
 
 const DEMO_PASSWORD = 'KFintech@2026';
 
 const LoginPage = () => {
-    const { login, getRoleDefaultRoute } = useAuth();
+    const { login, verifyOtp, getRoleDefaultRoute } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [otp, setOtp] = useState('');
+    
+    // UI States
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
     const [showDemo, setShowDemo] = useState(false);
+    const [isOtpStep, setIsOtpStep] = useState(false);
 
-    // After login, redirect to the page the user originally tried to visit
     const from = location.state?.from?.pathname || null;
 
-    const handleSubmit = async (e) => {
+    useEffect(() => {
+        if (location.state?.message) {
+            setSuccessMessage(location.state.message);
+            // Clear the message from location state so it doesn't show again on refresh
+            navigate(location.pathname, { replace: true });
+        }
+    }, [location, navigate]);
+
+    const handleLoginSubmit = async (e) => {
         e.preventDefault();
         if (!email || !password) {
             setError('Please enter your email and password.');
@@ -38,11 +48,35 @@ const LoginPage = () => {
         setError('');
 
         try {
-            const user = await login(email.trim().toLowerCase(), password);
+            const data = await login(email.trim().toLowerCase(), password);
+            if (data.requiresOtp) {
+                setIsOtpStep(true);
+                setSuccessMessage(data.message || 'OTP sent successfully.');
+            }
+        } catch (err) {
+            const msg = err.response?.data?.message || 'Login failed. Please check your credentials.';
+            setError(msg);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleOtpSubmit = async (e) => {
+        e.preventDefault();
+        if (!otp) {
+            setError('Please enter the OTP.');
+            return;
+        }
+        setIsLoading(true);
+        setError('');
+        setSuccessMessage('');
+
+        try {
+            const user = await verifyOtp(email.trim().toLowerCase(), otp);
             const destination = from || getRoleDefaultRoute(user.role);
             navigate(destination, { replace: true });
         } catch (err) {
-            const msg = err.response?.data?.message || 'Login failed. Please check your credentials.';
+            const msg = err.response?.data?.message || 'Invalid OTP.';
             setError(msg);
         } finally {
             setIsLoading(false);
@@ -53,187 +87,169 @@ const LoginPage = () => {
         setEmail(cred.email);
         setPassword(DEMO_PASSWORD);
         setError('');
+        setSuccessMessage('');
+        setIsOtpStep(false);
+        setOtp('');
     };
 
     return (
-        <div className="min-h-screen bg-kfintech-bg flex flex-col items-center justify-center px-4 relative overflow-hidden">
-
-            {/* Ambient background glow orbs */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl" />
-                <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-900/5 rounded-full blur-3xl" />
+        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+            <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+                <h1 className="text-3xl font-bold text-gray-900">KFintech Nexus</h1>
+                <p className="mt-2 text-sm text-gray-600">Secure Investor & Operations Portal</p>
             </div>
 
-            <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: 'easeOut' }}
-                className="w-full max-w-md relative z-10"
-            >
-                {/* Brand Header */}
-                <div className="text-center mb-10">
-                    <motion.div
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
-                        className="inline-flex items-center justify-center w-16 h-16 bg-kfintech-primary/15 border border-kfintech-primary/40 rounded-2xl mb-5 shadow-[0_0_30px_rgba(59,130,246,0.25)]"
-                    >
-                        <Activity className="w-8 h-8 text-kfintech-primary" />
-                    </motion.div>
-                    <h1 className="text-3xl font-black text-white tracking-tight">KFintech Nexus</h1>
-                    <p className="text-gray-500 mt-2 text-sm font-medium">Secure Investor & Operations Portal</p>
-                </div>
+            <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+                <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-200">
+                    <h2 className="text-xl font-semibold mb-4 text-gray-800">
+                        {isOtpStep ? 'Two-Factor Authentication' : 'Sign in to your account'}
+                    </h2>
+                    {!isOtpStep && (
+                        <p className="text-sm text-gray-500 mb-6">
+                            Don't have an account?{' '}
+                            <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
+                                Register
+                            </Link>
+                        </p>
+                    )}
 
-                {/* Login Card */}
-                <div className="glass-panel rounded-2xl p-8 shadow-2xl border border-kfintech-border/80">
-
-                    <div className="mb-7">
-                        <h2 className="text-xl font-extrabold text-white tracking-tight">Sign in to your account</h2>
-                        <p className="text-gray-500 text-sm mt-1">Access is role-restricted. Unauthorised attempts are logged.</p>
-                    </div>
-
-                    {/* Error Banner */}
-                    <AnimatePresence>
-                        {error && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="mb-5 p-4 rounded-xl bg-red-500/10 border border-red-500/40 text-red-400 text-sm font-medium flex items-center gap-3"
-                            >
-                                <span className="text-lg shrink-0">⚠️</span>
-                                {error}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    <form onSubmit={handleSubmit} className="space-y-5" id="login-form" noValidate>
-
-                        {/* Email Field */}
-                        <div>
-                            <label htmlFor="login-email" className="block text-xs font-extrabold text-kfintech-primary mb-2 uppercase tracking-widest">
-                                Email Address
-                            </label>
-                            <input
-                                id="login-email"
-                                type="email"
-                                autoComplete="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="you@kfintech.com"
-                                className="w-full bg-kfintech-bg border border-kfintech-border rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:ring-2 focus:ring-kfintech-primary/50 focus:border-kfintech-primary outline-none transition-all text-sm shadow-inner"
-                            />
+                    {error && (
+                        <div className="mb-4 bg-red-50 text-red-600 p-3 rounded text-sm border border-red-200">
+                            ⚠️ {error}
                         </div>
+                    )}
+                    {successMessage && (
+                        <div className="mb-4 bg-green-50 text-green-600 p-3 rounded text-sm border border-green-200">
+                            ✅ {successMessage}
+                        </div>
+                    )}
 
-                        {/* Password Field */}
-                        <div>
-                            <label htmlFor="login-password" className="block text-xs font-extrabold text-kfintech-primary mb-2 uppercase tracking-widest">
-                                Password
-                            </label>
-                            <div className="relative">
+                    {!isOtpStep ? (
+                        <form onSubmit={handleLoginSubmit} className="space-y-4" noValidate>
+                            <div>
+                                <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
                                 <input
-                                    id="login-password"
-                                    type={showPassword ? 'text' : 'password'}
-                                    autoComplete="current-password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="••••••••••"
-                                    className="w-full bg-kfintech-bg border border-kfintech-border rounded-xl px-4 py-3.5 pr-12 text-white placeholder-gray-600 focus:ring-2 focus:ring-kfintech-primary/50 focus:border-kfintech-primary outline-none transition-all text-sm shadow-inner"
+                                    id="login-email"
+                                    type="email"
+                                    autoComplete="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="you@kfintech.com"
+                                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-black"
                                 />
+                            </div>
+
+                            <div>
+                                <div className="flex justify-between items-center mb-1">
+                                    <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">Password</label>
+                                    <Link to="/forgot-password" className="text-xs font-medium text-blue-600 hover:text-blue-500">
+                                        Forgot password?
+                                    </Link>
+                                </div>
+                                <div className="relative">
+                                    <input
+                                        id="login-password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        autoComplete="current-password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="••••••••••"
+                                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-black"
+                                    />
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setShowPassword(v => !v)}
+                                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-blue-600 hover:text-blue-500"
+                                    >
+                                        {showPassword ? 'Hide' : 'Show'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button 
+                                id="login-submit-btn" 
+                                type="submit" 
+                                disabled={isLoading}
+                                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                            >
+                                {isLoading ? 'Authenticating...' : 'Sign In Securely'}
+                            </button>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleOtpSubmit} className="space-y-4" noValidate>
+                            <div>
+                                <label htmlFor="login-otp" className="block text-sm font-medium text-gray-700 mb-1">6-Digit OTP</label>
+                                <input
+                                    id="login-otp"
+                                    type="text"
+                                    maxLength={6}
+                                    value={otp}
+                                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                                    placeholder="000000"
+                                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-center tracking-widest text-lg font-mono text-black"
+                                />
+                            </div>
+
+                            <div className="flex space-x-3">
                                 <button
                                     type="button"
-                                    id="toggle-password-visibility"
-                                    onClick={() => setShowPassword(v => !v)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
-                                    aria-label="Toggle password visibility"
+                                    onClick={() => {
+                                        setIsOtpStep(false);
+                                        setSuccessMessage('');
+                                        setError('');
+                                    }}
+                                    className="w-1/3 flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                 >
-                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    Cancel
+                                </button>
+                                <button 
+                                    id="otp-submit-btn" 
+                                    type="submit" 
+                                    disabled={isLoading || otp.length !== 6}
+                                    className="w-2/3 flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                                >
+                                    {isLoading ? 'Verifying...' : 'Verify & Login'}
                                 </button>
                             </div>
-                        </div>
+                        </form>
+                    )}
+                </div>
 
-                        {/* Submit Button */}
-                        <motion.button
-                            id="login-submit-btn"
-                            type="submit"
-                            disabled={isLoading}
-                            whileHover={{ scale: isLoading ? 1 : 1.02 }}
-                            whileTap={{ scale: isLoading ? 1 : 0.98 }}
-                            className={`w-full flex items-center justify-center gap-2.5 py-4 rounded-xl font-extrabold text-sm uppercase tracking-widest transition-all shadow-lg ${
-                                isLoading
-                                    ? 'bg-kfintech-border text-gray-500 cursor-wait'
-                                    : 'bg-kfintech-primary text-white hover:bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.6)]'
-                            }`}
+                {!isOtpStep && (
+                    <div className="mt-6">
+                        <button 
+                            id="toggle-demo-credentials" 
+                            type="button" 
+                            onClick={() => setShowDemo(v => !v)}
+                            className="w-full flex items-center justify-between px-4 py-2 bg-white border border-gray-200 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
                         >
-                            {isLoading ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Authenticating...
-                                </>
-                            ) : (
-                                <>
-                                    <LogIn className="w-4 h-4" />
-                                    Sign In Securely
-                                </>
-                            )}
-                        </motion.button>
-                    </form>
+                            <span>Demo Credentials</span>
+                            <span>{showDemo ? '▲' : '▼'}</span>
+                        </button>
 
-                    {/* Security badge */}
-                    <div className="mt-6 flex items-center justify-center gap-2 text-xs text-gray-600">
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>JWT · RBAC · AES-256 Encrypted · Session expires in 8h</span>
-                    </div>
-                </div>
-
-                {/* Demo Credentials Panel */}
-                <div className="mt-4">
-                    <button
-                        id="toggle-demo-credentials"
-                        type="button"
-                        onClick={() => setShowDemo(v => !v)}
-                        className="w-full flex items-center justify-between px-5 py-3.5 glass-panel rounded-xl text-gray-400 hover:text-white text-sm font-semibold transition-colors border border-kfintech-border/60 hover:border-kfintech-primary/30"
-                    >
-                        <span className="flex items-center gap-2">
-                            <span className="text-base">🔑</span> Demo Credentials
-                        </span>
-                        {showDemo ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
-
-                    <AnimatePresence>
                         {showDemo && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="overflow-hidden"
-                            >
-                                <div className="mt-2 glass-panel rounded-xl p-4 space-y-2 border border-kfintech-border/60">
-                                    <p className="text-xs text-gray-500 font-mono mb-3">
-                                        Password for all accounts: <span className="text-white font-bold bg-kfintech-bg px-2 py-0.5 rounded border border-kfintech-border ml-1">{DEMO_PASSWORD}</span>
-                                    </p>
+                            <div className="mt-2 bg-white border border-gray-200 rounded-md p-4 shadow-sm text-sm">
+                                <p className="mb-3 text-gray-600">Password for all accounts: <span className="font-mono bg-gray-100 px-1 rounded">{DEMO_PASSWORD}</span></p>
+                                <ul className="space-y-2">
                                     {DEMO_CREDENTIALS.map((cred) => (
-                                        <motion.button
-                                            key={cred.email}
-                                            id={`demo-${cred.role.toLowerCase()}`}
-                                            type="button"
-                                            whileHover={{ scale: 1.01 }}
-                                            whileTap={{ scale: 0.99 }}
-                                            onClick={() => fillDemo(cred)}
-                                            className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border text-left transition-all hover:brightness-110 ${cred.bg}`}
-                                        >
-                                            <span className="text-xs font-mono text-gray-300">{cred.email}</span>
-                                            <span className={`text-[10px] font-black uppercase tracking-widest ${cred.color}`}>{cred.role}</span>
-                                        </motion.button>
+                                        <li key={cred.email}>
+                                            <button 
+                                                type="button" 
+                                                id={`demo-${cred.role.toLowerCase()}`} 
+                                                onClick={() => fillDemo(cred)}
+                                                className="w-full text-left px-3 py-2 border border-gray-200 rounded hover:bg-blue-50 hover:border-blue-300 flex justify-between items-center transition-colors"
+                                            >
+                                                <span className="font-medium text-gray-800">{cred.email}</span>
+                                                <span className="text-xs text-gray-500">{cred.role}</span>
+                                            </button>
+                                        </li>
                                     ))}
-                                    <p className="text-xs text-gray-600 pt-1 text-center">Click a row to auto-fill credentials</p>
-                                </div>
-                            </motion.div>
+                                </ul>
+                            </div>
                         )}
-                    </AnimatePresence>
-                </div>
-            </motion.div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

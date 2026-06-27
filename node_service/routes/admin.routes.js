@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/upload');
 const adminController = require('../controllers/admin.controller');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth.middleware');
 
 // Route: POST /api/admin/verify-document
 // L1 Maker desk and Super Admins can verify investor documents

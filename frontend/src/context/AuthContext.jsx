@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import apiClient from '../api/client';
+import React, { createContext, useContext, useCallback } from 'react';
+import { useSession } from '../hooks/useSession';
+import { authApi } from '../api/auth.api';
 
 const AuthContext = createContext(null);
 
@@ -13,69 +14,36 @@ const ROLE_DEFAULT_ROUTE = {
 export const getRoleDefaultRoute = (role) => ROLE_DEFAULT_ROUTE[role] || '/login';
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const { user, isLoading, error, clearSession, updateSession } = useSession();
 
-    useEffect(() => {
-        const restoreSession = async () => {
-            const token = localStorage.getItem('kfintech_token');
-            if (!token) {
-                setIsLoading(false);
-                return;
-            }
-
-            try {
-                const res = await apiClient.get('/auth/me');
-                setUser(res.data.user);
-            } catch (err) {
-                // Token expired or invalid — clear storage
-                localStorage.removeItem('kfintech_token');
-                localStorage.removeItem('kfintech_user');
-                setUser(null);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        restoreSession();
-    }, []);
-
-    /**
-     * login(email, password)
-     * Calls POST /api/auth/login, stores the JWT and user profile.
-     * Returns the user object so the caller can redirect based on role.
-     */
     const login = useCallback(async (email, password) => {
-        const res = await apiClient.post('/auth/login', { email, password });
-        const { accessToken, user: userData } = res.data;
-
-        localStorage.setItem('kfintech_token', accessToken);
-        localStorage.setItem('kfintech_user', JSON.stringify(userData));
-        setUser(userData);
-
-        return userData;
+        const res = await authApi.login(email, password);
+        return res.data;
     }, []);
 
-    /**
-     * logout()
-     * Clears session state and localStorage. The caller should navigate to /login.
-     */
+    const verifyOtp = useCallback(async (email, otp) => {
+        const res = await authApi.verifyOtp(email, otp);
+        const { user: userData } = res.data;
+        updateSession(userData);
+        return userData;
+    }, [updateSession]);
+
     const logout = useCallback(async () => {
         try {
-            await apiClient.post('/auth/logout');
+            await authApi.logout();
         } catch (_) {
             // Ignore errors, still clear client-side session
         }
-        localStorage.removeItem('kfintech_token');
-        localStorage.removeItem('kfintech_user');
-        setUser(null);
-    }, []);
+        clearSession();
+    }, [clearSession]);
 
     const value = {
         user,
         isLoading,
+        error,
         isAuthenticated: !!user,
         login,
+        verifyOtp,
         logout,
         getRoleDefaultRoute
     };

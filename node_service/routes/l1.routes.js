@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const l1Controller = require('../controllers/l1.controller');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth.middleware');
 
 // Route: GET /api/l1/tickets
 // L1 Queue with filtering and pagination

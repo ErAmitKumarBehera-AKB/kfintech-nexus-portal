@@ -9,6 +9,7 @@ import ChatbotWidget from './components/common/ChatbotWidget';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import InvestorDashboard from './pages/InvestorDashboard';
 import L1MakerDesk from './pages/L1MakerDesk';
 import L2CheckerDesk from './pages/L2CheckerDesk';
@@ -16,7 +17,15 @@ import AdminDashboard from './pages/AdminDashboard';
 import ProfilePage from './pages/ProfilePage';
 
 const AppRoutes = () => {
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, isLoading } = useAuth();
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-kfintech-bg flex items-center justify-center">
+                <div className="w-16 h-16 border-4 border-kfintech-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-kfintech-bg font-sans flex flex-col">
@@ -52,6 +61,15 @@ const AppRoutes = () => {
                             isAuthenticated
                                 ? <Navigate to={getRoleDefaultRoute(user?.role)} replace />
                                 : <RegisterPage />
+                        }
+                    />
+
+                    <Route
+                        path="/forgot-password"
+                        element={
+                            isAuthenticated
+                                ? <Navigate to={getRoleDefaultRoute(user?.role)} replace />
+                                : <ForgotPasswordPage />
                         }
                     />
 
