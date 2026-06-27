@@ -21,14 +21,14 @@ const AppRoutes = () => {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-kfintech-bg flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-kfintech-primary border-t-transparent rounded-full animate-spin"></div>
+            <div>
+                <div></div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-kfintech-bg font-sans flex flex-col">
+        <div>
             {/* Navbar and Chatbot are only shown when the user is logged in */}
             {isAuthenticated && (
                 <>
@@ -37,12 +37,16 @@ const AppRoutes = () => {
                 </>
             )}
 
-            <main className={`flex-grow ${isAuthenticated ? 'container mx-auto max-w-7xl mt-6' : ''}`}>
+            <main>
                 <Routes>
                     {/* ── Public Routes ── */}
                     <Route 
                         path="/" 
-                        element={<LandingPage />} 
+                        element={
+                            isAuthenticated 
+                                ? <Navigate to={getRoleDefaultRoute(user?.role)} replace /> 
+                                : <LandingPage />
+                        } 
                     />
 
                     <Route

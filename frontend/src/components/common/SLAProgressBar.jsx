@@ -56,14 +56,14 @@ const SLAProgressBar = ({ currentStatus, timeline = [] }) => {
     };
 
     return (
-        <div className="py-8">
-            <div className="relative max-w-3xl mx-auto flex justify-between items-start">
+        <div>
+            <div>
                 {/* Background Track */}
-                <div className="absolute top-[18px] left-8 right-8 h-1.5 bg-white/10 rounded-full" />
+                <div  />
                 
                 {/* Active Progress Track */}
                 <motion.div 
-                    className={`absolute top-[18px] left-8 h-1.5 rounded-full origin-left ${isRejected ? 'bg-red-500' : 'bg-emerald-500'}`}
+                    
                     initial={{ scaleX: 0 }}
                     animate={{ scaleX: safeIndex / (displaySteps.length - 1) }}
                     transition={{ duration: 0.8, ease: "easeInOut" }}
@@ -87,25 +87,20 @@ const SLAProgressBar = ({ currentStatus, timeline = [] }) => {
                     }
 
                     return (
-                        <div key={step.id} className="relative z-10 flex flex-col items-center w-32 -mx-8">
+                        <div key={step.id}>
                             <motion.div
-                                className={`w-10 h-10 rounded-full flex items-center justify-center border-4 transition-colors ${nodeColor}`}
+                                
                                 initial={false}
-                                animate={{ scale: isActive ? 1.2 : 1 }}
-                            >
-                                <StepIcon className="w-4 h-4" />
+                                animate={{ scale: isActive ? 1.2 : 1 }}>
+                                <StepIcon  />
                             </motion.div>
                             
-                            <div className="mt-4 text-center">
-                                <p className={`text-xs font-bold uppercase tracking-widest ${
-                                    isActive && isRejected ? 'text-red-400' : 
-                                    isActive ? 'text-white' : 
-                                    isCompleted ? 'text-emerald-400' : 'text-gray-500'
-                                }`}>
+                            <div>
+                                <p>
                                     {step.label}
                                 </p>
                                 {dateReached && (
-                                    <p className="text-[10px] text-gray-500 font-mono mt-1">
+                                    <p>
                                         {format(new Date(dateReached), 'MMM dd, HH:mm')}
                                     </p>
                                 )}
