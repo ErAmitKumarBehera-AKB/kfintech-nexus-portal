@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth, getRoleDefaultRoute } from './context/AuthContext';
 
 import Navbar from './components/Navbar';
@@ -18,6 +18,7 @@ import ProfilePage from './pages/ProfilePage';
 
 const AppRoutes = () => {
     const { user, isAuthenticated, isLoading } = useAuth();
+    const location = useLocation();
 
     if (isLoading) {
         return (
@@ -29,8 +30,7 @@ const AppRoutes = () => {
 
     return (
         <div>
-            {/* Navbar and Chatbot are only shown when the user is logged in */}
-            {isAuthenticated && (
+            {isAuthenticated && !location.pathname.startsWith('/investor') && (
                 <>
                     <Navbar />
                     <ChatbotWidget />

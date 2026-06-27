@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../../api/client';
 import SLAProgressBar from '../common/SLAProgressBar';
-import { ArrowLeft, Clock, FileText, Download, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Clock, FileText, Download, CheckCircle2, AlertCircle, Send } from 'lucide-react';
 import { format } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
 const TicketDetail = ({ ticketId, onBack }) => {
     const [ticket, setTicket] = useState(null);
     const [timeline, setTimeline] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // New Features State
     const [newComment, setNewComment] = useState("");
     const [submittingComment, setSubmittingComment] = useState(false);
     const [resubmitFile, setResubmitFile] = useState(null);
@@ -38,255 +43,256 @@ const TicketDetail = ({ ticketId, onBack }) => {
     }, [ticketId]);
 
     const handleAddComment = async (e) => {
-            e.preventDefault();
-            if (!newComment.trim()) return;
-            setSubmittingComment(true);
-            try {
-                const res = await apiClient.post(`/tickets/${ticketId}/comments`, { message: newComment });
-                setTicket({ ...ticket, comments: res.data.comments });
-                setNewComment("");
-                // Refresh to update timeline
-                const refreshRes = await apiClient.get(`/tickets/${ticketId}`);
-                setTimeline(refreshRes.data.timeline);
-            } catch (err) {
-                console.error("Failed to add comment:", err);
-            } finally {
-                setSubmittingComment(false);
-            }
-        };
+        e.preventDefault();
+        if (!newComment.trim()) return;
+        setSubmittingComment(true);
+        try {
+            const res = await apiClient.post(`/tickets/${ticketId}/comments`, { message: newComment });
+            setTicket({ ...ticket, comments: res.data.comments });
+            setNewComment("");
+            const refreshRes = await apiClient.get(`/tickets/${ticketId}`);
+            setTimeline(refreshRes.data.timeline);
+        } catch (err) {
+            console.error("Failed to add comment:", err);
+        } finally {
+            setSubmittingComment(false);
+        }
+    };
 
-        const handleResubmit = async (e) => {
-            e.preventDefault();
-            if (!resubmitFile) return;
-            setResubmitting(true);
-            try {
-                const formData = new FormData();
-                formData.append('documents', resubmitFile);
-                await apiClient.post(`/tickets/${ticketId}/resubmit`, formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
-                // Refresh
-                const refreshRes = await apiClient.get(`/tickets/${ticketId}`);
-                setTicket(refreshRes.data.ticket);
-                setTimeline(refreshRes.data.timeline);
-                setResubmitFile(null);
-            } catch (err) {
-                console.error("Failed to resubmit ticket:", err);
-            } finally {
-                setResubmitting(false);
-            }
-        };
+    const handleResubmit = async (e) => {
+        e.preventDefault();
+        if (!resubmitFile) return;
+        setResubmitting(true);
+        try {
+            const formData = new FormData();
+            formData.append('documents', resubmitFile);
+            await apiClient.post(`/tickets/${ticketId}/resubmit`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            const refreshRes = await apiClient.get(`/tickets/${ticketId}`);
+            setTicket(refreshRes.data.ticket);
+            setTimeline(refreshRes.data.timeline);
+            setResubmitFile(null);
+        } catch (err) {
+            console.error("Failed to resubmit ticket:", err);
+        } finally {
+            setResubmitting(false);
+        }
+    };
 
     if (isLoading) {
-        return <div><div  /></div>;
+        return (
+            <div className="flex h-64 items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-zinc-900" />
+            </div>
+        );
     }
 
     if (!ticket) {
-        return <div>Ticket not found.</div>;
+        return <div className="text-center p-8 text-zinc-500">Ticket not found.</div>;
     }
 
     return (
-        <div>
-            <button 
-                onClick={onBack}>
-                <ArrowLeft  /> Back to Tickets
-            </button>
+        <div className="max-w-5xl mx-auto space-y-6 pb-12">
+            <Button variant="ghost" onClick={onBack} className="text-zinc-500 hover:text-zinc-900 -ml-4">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Tickets
+            </Button>
 
-            <div>
-                {/* Header Section */}
-                <div>
-                    <div>
-                        <div>
-                            <div>
-                                <span>
-                                    Ticket #{ticket._id.toString().slice(-6).toUpperCase()}
-                                </span>
-                                <span>
-                                    {ticket.serviceType}
-                                </span>
-                            </div>
-                            <h1>{ticket.title || ticket.serviceType}</h1>
-                        </div>
-                        <div>
-                            <p>Created on</p>
-                            <p>{format(new Date(ticket.createdAt), 'MMMM dd, yyyy')}</p>
-                        </div>
-                    </div>
-
-                    {/* SLA Tracker */}
-                    <div>
-                        <div>
-                            <h3>
-                                <Clock  /> SLA Progress
-                            </h3>
-                            <div>
-                                Deadline: {ticket.slaTimeline?.deadline ? format(new Date(ticket.slaTimeline.deadline), 'MMM dd, yyyy') : 'N/A'}
-                            </div>
-                        </div>
-                        <SLAProgressBar currentStatus={ticket.status} timeline={timeline} />
-                    </div>
-                </div>
-
-                {/* Details Section */}
-                <div>
-                    <div>
-                        <div>
-                            <h3>Description</h3>
-                            <div>
-                                <p>{ticket.description}</p>
-                            </div>
-                        </div>
-
-                        {ticket.serviceMetadata && Object.keys(ticket.serviceMetadata).length> 0 && (
-                            <div>
-                                <h3>Service Details</h3>
-                                <div>
-                                    {Object.entries(ticket.serviceMetadata).map(([key, value]) => (
-                                        <div key={key}>
-                                            <span>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                                            <span>{value}</span>
-                                        </div>
-                                    ))}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    <Card className="border-zinc-200 shadow-sm overflow-hidden">
+                        <div className="bg-zinc-50 p-6 border-b border-zinc-100">
+                            <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-zinc-500">
+                                        Ticket #{ticket._id.toString().slice(-6).toUpperCase()}
+                                    </span>
+                                    <Badge variant="outline" className="bg-white">{ticket.serviceType}</Badge>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs text-zinc-500">Created on</p>
+                                    <p className="text-sm font-medium text-zinc-900">{format(new Date(ticket.createdAt), 'MMMM dd, yyyy')}</p>
                                 </div>
                             </div>
-                        )}
-                        
-                        {/* Timeline / Audit Logs */}
-                        <div>
-                            <h3>Activity Timeline</h3>
-                            <div>
-                                {timeline.map((log, index) => (
-                                    <div key={log._id}>
-                                        <div  />
-                                        <p>{log.action.replace(/_/g, ' ')}</p>
-                                        {log.details?.note && <p>{log.details.note}</p>}
-                                        <p>{format(new Date(log.createdAt || log.timestamp), 'MMM dd, yyyy HH:mm')}</p>
+                            <h1 className="text-2xl font-semibold text-zinc-900 leading-tight">{ticket.title || ticket.serviceType}</h1>
+                        </div>
+
+                        <CardContent className="p-6">
+                            <div className="space-y-6">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Clock className="w-4 h-4 text-zinc-500" /> 
+                                        <h3 className="font-medium text-zinc-900">SLA Progress</h3>
+                                        <span className="ml-auto text-xs text-zinc-500">
+                                            Deadline: {ticket.slaTimeline?.deadline ? format(new Date(ticket.slaTimeline.deadline), 'MMM dd, yyyy') : 'N/A'}
+                                        </span>
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-                        </div>
-                        
-                        {/* Comments Section */}
-                        <div>
-                            <h3>Comments</h3>
-                            
-                            <div>
-                                {ticket.comments?.map((comment, idx) => (
-                                    <div key={idx}>
-                                        <div>
-                                            <span>{comment.authorRole.replace('_', ' ')}</span>
-                                            <span>{format(new Date(comment.createdAt), 'MMM dd, HH:mm')}</span>
+                                    <SLAProgressBar currentStatus={ticket.status} timeline={timeline} />
+                                </div>
+                                
+                                <Separator />
+
+                                <div>
+                                    <h3 className="font-medium text-zinc-900 mb-2">Description</h3>
+                                    <div className="bg-zinc-50 p-4 rounded-lg border border-zinc-100">
+                                        <p className="text-sm text-zinc-700 whitespace-pre-wrap">{ticket.description}</p>
+                                    </div>
+                                </div>
+
+                                {ticket.serviceMetadata && Object.keys(ticket.serviceMetadata).length > 0 && (
+                                    <div>
+                                        <h3 className="font-medium text-zinc-900 mb-3">Service Details</h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white border border-zinc-200 rounded-lg p-4">
+                                            {Object.entries(ticket.serviceMetadata).map(([key, value]) => (
+                                                <div key={key} className="space-y-1">
+                                                    <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                                    <p className="text-sm font-medium text-zinc-900">{value}</p>
+                                                </div>
+                                            ))}
                                         </div>
-                                        <p>{comment.message}</p>
                                     </div>
-                                ))}
-                                {(!ticket.comments || ticket.comments.length === 0) && (
-                                    <p>No comments yet.</p>
                                 )}
                             </div>
+                        </CardContent>
+                    </Card>
 
-                            <form onSubmit={handleAddComment}>
-                                <input 
-                                    type="text" 
-                                    value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
-                                    placeholder="Add a comment..."
-                                    
-                                />
-                                <button 
-                                    type="submit" 
-                                    disabled={submittingComment || !newComment.trim()}>
-                                    {submittingComment ? 'Sending...' : 'Post'}
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-
-                    {/* Sidebar section */}
-                    <div>
-                        {/* Documents */}
-                        {ticket.documents && ticket.documents.length> 0 ? (
-                            <div>
-                                <h3>Attached Documents</h3>
-                                <div>
-                                    {ticket.documents.map((doc, idx) => (
-                                        <div key={idx}>
-                                            <div>
-                                                <div>
-                                                    <FileText  />
-                                                </div>
-                                                <div>
-                                                    <p>{doc.name}</p>
-                                                    <p>{(doc.size / 1024).toFixed(1)} KB</p>
-                                                </div>
+                    <Card className="border-zinc-200 shadow-sm">
+                        <CardHeader className="pb-3 border-b border-zinc-100">
+                            <CardTitle className="text-lg font-medium">Comments</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <ScrollArea className="h-[300px] p-6">
+                                <div className="space-y-4">
+                                    {ticket.comments?.map((comment, idx) => (
+                                        <div key={idx} className={`p-4 rounded-lg ${comment.authorRole === 'INVESTOR' ? 'bg-zinc-100 ml-8' : 'bg-white border border-zinc-200 mr-8'}`}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className={`text-xs font-semibold ${comment.authorRole === 'INVESTOR' ? 'text-zinc-900' : 'text-blue-600'}`}>
+                                                    {comment.authorRole.replace('_', ' ')}
+                                                </span>
+                                                <span className="text-[10px] text-zinc-500">{format(new Date(comment.createdAt), 'MMM dd, HH:mm')}</span>
                                             </div>
-                                            <a 
-                                                href={doc.s3Key} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer">
-                                                <Download  /> View Document
-                                            </a>
+                                            <p className="text-sm text-zinc-700 whitespace-pre-wrap">{comment.message}</p>
                                         </div>
                                     ))}
+                                    {(!ticket.comments || ticket.comments.length === 0) && (
+                                        <div className="text-center text-sm text-zinc-500 py-8">No comments yet.</div>
+                                    )}
                                 </div>
+                            </ScrollArea>
+                            <div className="p-4 border-t border-zinc-100 bg-zinc-50">
+                                <form onSubmit={handleAddComment} className="flex gap-2">
+                                    <Input 
+                                        type="text" 
+                                        value={newComment}
+                                        onChange={(e) => setNewComment(e.target.value)}
+                                        placeholder="Add a comment..."
+                                        className="bg-white"
+                                    />
+                                    <Button type="submit" disabled={submittingComment || !newComment.trim()} className="bg-zinc-900 text-white shrink-0">
+                                        {submittingComment ? 'Sending...' : <><Send className="w-4 h-4 mr-2"/> Post</>}
+                                    </Button>
+                                </form>
                             </div>
-                        ) : (
-                            <div>
-                                <h3>Documents</h3>
-                                <div>
-                                    <p>No documents attached.</p>
-                                </div>
+                        </CardContent>
+                    </Card>
+                    
+                    <Card className="border-zinc-200 shadow-sm">
+                        <CardHeader className="pb-3 border-b border-zinc-100">
+                            <CardTitle className="text-lg font-medium">Activity Timeline</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                            <div className="space-y-4 border-l-2 border-zinc-100 ml-2 pl-4">
+                                {timeline.map((log, index) => (
+                                    <div key={log._id} className="relative">
+                                        <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-zinc-300 ring-4 ring-white" />
+                                        <p className="text-sm font-medium text-zinc-900">{log.action.replace(/_/g, ' ')}</p>
+                                        {log.details?.note && <p className="text-sm text-zinc-600 mt-0.5">{log.details.note}</p>}
+                                        <p className="text-xs text-zinc-400 mt-1">{format(new Date(log.createdAt || log.timestamp), 'MMM dd, yyyy HH:mm')}</p>
+                                    </div>
+                                ))}
                             </div>
-                        )}
-                        
-                        {/* Priority & Flags */}
-                        <div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <div className="space-y-6">
+                    <Card className="border-zinc-200 shadow-sm">
+                        <CardHeader className="pb-3 border-b border-zinc-100">
+                            <CardTitle className="text-lg font-medium">Documents</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 space-y-3">
+                            {ticket.documents && ticket.documents.length > 0 ? (
+                                ticket.documents.map((doc, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-3 border border-zinc-200 rounded-lg bg-zinc-50">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="p-2 bg-white rounded border border-zinc-100 shrink-0">
+                                                <FileText className="w-4 h-4 text-zinc-500" />
+                                            </div>
+                                            <div className="truncate">
+                                                <p className="text-sm font-medium text-zinc-900 truncate">{doc.name}</p>
+                                                <p className="text-xs text-zinc-500">{(doc.size / 1024).toFixed(1)} KB</p>
+                                            </div>
+                                        </div>
+                                        <a href={doc.s3Key} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-zinc-200 rounded-md transition-colors text-zinc-500 hover:text-zinc-900 shrink-0">
+                                            <Download className="w-4 h-4" />
+                                        </a>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-zinc-500 text-center py-4">No documents attached.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                    
+                    <Card className="border-zinc-200 shadow-sm">
+                        <CardContent className="p-5 space-y-4">
                             <div>
-                                <p>Priority Level</p>
-                                <span>
-                                    {ticket.assignedPriority}
-                                </span>
+                                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-1">Priority Level</p>
+                                <Badge variant="secondary" className="bg-zinc-100 text-zinc-900">
+                                    {ticket.assignedPriority || 'UNASSIGNED'}
+                                </Badge>
                             </div>
                             
                             {ticket.isPotentialFraud && (
-                                <div>
-                                    <AlertCircle  />
-                                    <p>Flagged for manual review by AI system.</p>
+                                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                                    <p className="text-xs text-red-800 font-medium">Flagged for manual review by AI system.</p>
                                 </div>
                             )}
-                        </div>
+                        </CardContent>
+                    </Card>
 
-                        {/* Resubmit Flow for Rejected Tickets */}
-                        {ticket.status === 'REJECTED' && (
-                            <div>
-                                <div>
-                                    <h3>Ticket Rejected</h3>
-                                    <p>Please upload the correct documentation to resubmit this request.</p>
-                                    {ticket.revisionReason && (
-                                        <div>
-                                            <strong>Reason:</strong> {ticket.revisionReason}
-                                        </div>
-                                    )}
-                                </div>
-                                <form onSubmit={handleResubmit}>
-                                    <input 
+                    {ticket.status === 'REJECTED' && (
+                        <Card className="border-red-200 shadow-sm bg-red-50/50">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-red-700 text-base flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4" /> Ticket Rejected
+                                </CardTitle>
+                                <CardDescription className="text-red-600/80">Please upload correct documentation to resubmit.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {ticket.revisionReason && (
+                                    <div className="p-3 bg-white border border-red-100 rounded-lg">
+                                        <p className="text-sm text-red-900"><strong className="font-semibold">Reason:</strong> {ticket.revisionReason}</p>
+                                    </div>
+                                )}
+                                <form onSubmit={handleResubmit} className="space-y-3">
+                                    <Input 
                                         type="file" 
                                         onChange={(e) => setResubmitFile(e.target.files[0])}
-                                        
                                         required
+                                        className="bg-white border-red-200 text-sm file:text-red-700"
                                     />
-                                    <button 
-                                        type="submit"
-                                        disabled={resubmitting || !resubmitFile}>
+                                    <Button type="submit" disabled={resubmitting || !resubmitFile} className="w-full bg-red-600 hover:bg-red-700 text-white">
                                         {resubmitting ? 'Uploading...' : 'Resubmit Ticket'}
-                                    </button>
+                                    </Button>
                                 </form>
-                            </div>
-                        )}
-                    </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </div>
+        </div>
     );
 };
 

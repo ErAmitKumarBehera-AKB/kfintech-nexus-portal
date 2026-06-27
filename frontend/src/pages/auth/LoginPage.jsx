@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Activity, Eye, EyeOff } from 'lucide-react';
+import { Activity, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -98,7 +98,11 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-zinc-50 selection:bg-zinc-200">
+        <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-zinc-50 selection:bg-zinc-200 relative">
+            <Link to="/" className="absolute top-6 left-6 sm:top-8 sm:left-8 flex items-center text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to home
+            </Link>
             <div className="w-full max-w-sm">
                 <Card className="rounded-md border-zinc-200 bg-white shadow-sm">
                     <CardHeader className="space-y-1 text-center pb-6 pt-8">

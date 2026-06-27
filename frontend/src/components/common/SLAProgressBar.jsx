@@ -31,17 +31,12 @@ const SLAProgressBar = ({ currentStatus, timeline = [] }) => {
     const getStepDate = (stepId) => {
         if (!timeline || timeline.length === 0) return null;
         
-        // Find the most recent timeline event that transitioned to this state
-        // For OPEN, it's usually the first 'TICKET_CREATED' event
         if (stepId === 'OPEN') {
-            const first = timeline[timeline.length - 1]; // Oldest is at end or beginning depending on sort
-            // Assuming timeline is sorted newest first as per most DB queries
             return timeline[timeline.length - 1]?.createdAt; 
         }
 
-        // Map status IDs to possible timeline actions
         const actionMapping = {
-            'L1_REVIEW': 'DOCUMENT_AI_REJECTED', // Or just look for nearest chronologically
+            'L1_REVIEW': 'DOCUMENT_AI_REJECTED',
             'L2_APPROVAL': ['ESCALATED_TO_L2', 'DOCUMENT_AI_VERIFIED'],
             'RESOLVED': 'TICKET_RESOLVED',
             'CLOSED': 'TICKET_CLOSED',
@@ -56,18 +51,18 @@ const SLAProgressBar = ({ currentStatus, timeline = [] }) => {
     };
 
     return (
-        <div>
-            <div>
+        <div className="w-full py-4">
+            <div className="relative flex justify-between items-center w-full px-8">
                 {/* Background Track */}
-                <div  />
+                <div className="absolute left-8 right-8 top-1/2 h-1 -translate-y-1/2 bg-zinc-100 rounded-full" />
                 
                 {/* Active Progress Track */}
                 <motion.div 
-                    
+                    className="absolute left-8 top-1/2 h-1 -translate-y-1/2 bg-zinc-900 rounded-full"
                     initial={{ scaleX: 0 }}
                     animate={{ scaleX: safeIndex / (displaySteps.length - 1) }}
                     transition={{ duration: 0.8, ease: "easeInOut" }}
-                    style={{ width: 'calc(100% - 64px)' }}
+                    style={{ transformOrigin: "left", width: 'calc(100% - 64px)' }}
                 />
 
                 {/* Nodes */}
@@ -77,30 +72,30 @@ const SLAProgressBar = ({ currentStatus, timeline = [] }) => {
                     const dateReached = getStepDate(step.id);
                     const StepIcon = step.icon;
 
-                    let nodeColor = 'bg-kfintech-bg border-white/20 text-gray-500';
+                    let nodeColor = 'bg-white border-zinc-200 text-zinc-400';
                     if (isCompleted) {
                         nodeColor = isRejected && isActive 
-                            ? 'bg-red-500 border-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)]'
-                            : 'bg-emerald-500 border-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]';
+                            ? 'bg-red-600 border-red-600 text-white'
+                            : 'bg-zinc-900 border-zinc-900 text-white';
                     } else if (isActive && !isRejected) {
-                        nodeColor = 'bg-blue-500 border-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]';
+                        nodeColor = 'bg-zinc-900 border-zinc-900 text-white shadow-sm ring-2 ring-zinc-200';
                     }
 
                     return (
-                        <div key={step.id}>
+                        <div key={step.id} className="relative z-10 flex flex-col items-center">
                             <motion.div
-                                
+                                className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-colors duration-300 ${nodeColor}`}
                                 initial={false}
-                                animate={{ scale: isActive ? 1.2 : 1 }}>
-                                <StepIcon  />
+                                animate={{ scale: isActive ? 1.1 : 1 }}>
+                                <StepIcon className="w-4 h-4" />
                             </motion.div>
                             
-                            <div>
-                                <p>
+                            <div className="absolute top-12 text-center w-28 -ml-14 left-1/2">
+                                <p className={`text-xs font-semibold ${isCompleted ? (isRejected && isActive ? 'text-red-600' : 'text-zinc-900') : 'text-zinc-400'}`}>
                                     {step.label}
                                 </p>
                                 {dateReached && (
-                                    <p>
+                                    <p className="text-[10px] text-zinc-500 mt-0.5">
                                         {format(new Date(dateReached), 'MMM dd, HH:mm')}
                                     </p>
                                 )}
@@ -109,6 +104,8 @@ const SLAProgressBar = ({ currentStatus, timeline = [] }) => {
                     );
                 })}
             </div>
+            {/* Add bottom padding to account for absolute positioned text */}
+            <div className="h-12" />
         </div>
     );
 };
