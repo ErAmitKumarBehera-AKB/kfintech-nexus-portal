@@ -8,6 +8,7 @@ const loginController = require('../controllers/auth/login.controller');
 const sessionController = require('../controllers/auth/session.controller');
 const passwordController = require('../controllers/auth/password.controller');
 const profileController = require('../controllers/auth/profile.controller');
+const upload = require('../middleware/upload');
 
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 mins
@@ -31,6 +32,6 @@ router.post('/reset-password', passwordController.resetPassword);
 router.post('/change-password', authenticate, passwordController.changePassword);
 
 // Profile
-router.put('/profile', authenticate, profileController.updateProfile);
+router.put('/profile', authenticate, upload.any(), profileController.updateProfile);
 
 module.exports = router;

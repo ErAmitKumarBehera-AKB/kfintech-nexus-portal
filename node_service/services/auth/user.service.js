@@ -9,11 +9,12 @@ exports.getUserByEmail = async (email) => {
 };
 
 exports.updateUserProfile = async (userId, updateData) => {
-    const allowed = ['name', 'phoneNumber', 'bankAccount', 'nominee', 'address'];
+    const allowed = ['name', 'phoneNumber', 'bankAccount', 'nominee', 'address', 'kyc', 'profileCompleted'];
     const updates = {};
     
     allowed.forEach(key => {
         if (updateData[key] !== undefined) {
+            // For nested objects like kyc, we might need deep merge, but direct assign is ok if full object is sent
             updates[key] = updateData[key];
         }
     });
@@ -34,6 +35,7 @@ exports.getPublicProfile = (user) => {
         kyc: user.kyc,
         bankAccount: user.bankAccount,
         nominee: user.nominee,
-        address: user.address
+        address: user.address,
+        profileCompleted: user.profileCompleted
     };
 };

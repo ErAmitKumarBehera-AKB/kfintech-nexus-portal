@@ -1,18 +1,16 @@
 const mongoose = require('mongoose');
 const axios = require('axios');
-const Ticket = require('../models/Ticket');
-const AuditLog = require('../models/AuditLog');
-const { getServiceConfig, buildSlaTimeline } = require('../utils/serviceTypes');
+const ticketService = require('../services/ticket/ticket.service');
+const documentService = require('../services/ticket/document.service');
+const workflowService = require('../services/ticket/workflow.service');
+const auditService = require('../services/ticket/audit.service');
 const notificationService = require('../services/notificationService');
-
-const FormData = require('form-data');
-const { v4: uuidv4 } = require("uuid");
-const { uploadToS3 } = require('../services/s3Service');
+const { getServiceConfig, buildSlaTimeline } = require('../utils/serviceTypes');
 
 exports.createTicket = async (req, res) => {
-    // 1. Extract data
     const { title, description, complaintText, investorName = "Jane Doe", accountNumber = "123456789", serviceType = 'COMPLAINT' } = req.body;
     const finalDescription = description || complaintText || '';
+    
     let serviceMetadata = {};
     if (req.body.serviceMetadata) {
         try {
@@ -23,8 +21,8 @@ exports.createTicket = async (req, res) => {
             serviceMetadata = {};
         }
     }
+    
     const files = req.files || [];
-
     const investorId = req.user ? req.user.id : new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a00'); 
 
     if (!finalDescription) {
@@ -33,15 +31,12 @@ exports.createTicket = async (req, res) => {
 
     // Validate against Service Configuration
     const serviceConfig = getServiceConfig(serviceType);
-    
-    // Check required fields
     for (const field of serviceConfig.requiredFields) {
         if (!serviceMetadata[field] && !req.body[field]) {
             return res.status(400).json({ message: `Missing required field for ${serviceConfig.label}: ${field}` });
         }
     }
 
-    // Check required documents
     if (serviceConfig.requiredDocuments.length > 0 && files.length === 0) {
         return res.status(400).json({ message: `Missing required document for ${serviceConfig.label}: ${serviceConfig.requiredDocuments[0]}` });
     }
@@ -54,7 +49,6 @@ exports.createTicket = async (req, res) => {
         let aiPayload = { priority: 'NORMAL', score: 0.5, fraud_alert: false };
         let aiSummary = [];
         
-        // Only run sentiment analysis for COMPLAINT tickets
         if (serviceType === 'COMPLAINT') {
             try {
                 const sentimentRes = await axios.post(`${mlServiceUrl}/sentiment/analyze`, {
@@ -66,56 +60,11 @@ exports.createTicket = async (req, res) => {
             }
         }
 
-        // --- C & D. Multi-Document S3 Upload & OCR ---
-        const uploadedDocuments = [];
+        const uploadedDocuments = await documentService.uploadDocuments(files);
         
-        for (const file of files) {
-            // Validate file type
-            const isPdf = file.mimetype === 'application/pdf';
-            const isImage = file.mimetype.startsWith('image/');
-            
-            if (!isPdf && !isImage) {
-                // Reject invalid file type
-                throw new Error("Invalid file type. Only PDF and images (PNG/JPG) are allowed.");
-            }
-
-            // D. S3 Document Upload
-            const fileName = `${uuidv4()}-${file.originalname}`;
-            let documentUrl = null;
-            try {
-                await uploadToS3({
-                    Key: fileName,
-                    Body: file.buffer,
-                    ContentType: file.mimetype,
-                });
-                
-                const endpoint = process.env.AWS_ENDPOINT_URL || 'http://localhost:4566';
-                const bucket = process.env.AWS_BUCKET_NAME || 'kfintech-bucket';
-                documentUrl = `${endpoint}/${bucket}/${encodeURIComponent(fileName)}`;
-            } catch (error) {
-                console.error("LocalStack S3 Upload Error:", error.message);
-                throw new Error("Failed to upload document to secure storage.");
-            }
-
-            let ocrExtractedText = null;
-            let ocrMatchVerified = false;
-
-            uploadedDocuments.push({
-                name: file.originalname,
-                fileType: file.mimetype,
-                size: file.size,
-                s3Key: documentUrl,
-                status: 'PENDING',
-                ocrExtraction: {
-                    extractedText: ocrExtractedText,
-                    matchVerified: ocrMatchVerified
-                }
-            });
-        }
-        // 4. Create Ticket Document with dynamic SLA
-        const slaConfig = buildSlaTimeline(serviceType);
+        const slaConfig = workflowService.calculateSla(serviceType);
         
-        const newTicket = new Ticket({
+        const newTicket = await ticketService.createTicket({
             investorId,
             investorName,
             accountNumber,
@@ -128,18 +77,11 @@ exports.createTicket = async (req, res) => {
             isPotentialFraud: aiPayload.fraud_alert || false,
             serviceType: serviceType || 'COMPLAINT',
             serviceMetadata,
-            slaTimeline: {
-                slaDays: slaConfig.slaDays,
-                deadline: slaConfig.deadline
-            },
+            slaTimeline: slaConfig,
             status: 'OPEN'
-        });
+        }, session);
 
-
-        await newTicket.save({ session });
-
-        // 5. Create AuditLog
-        const auditLog = new AuditLog({
+        await auditService.createAuditLog({
             entityId: newTicket._id,
             entityType: 'Ticket',
             action: 'TICKET_CREATED',
@@ -147,15 +89,12 @@ exports.createTicket = async (req, res) => {
             details: {
                 assignedPriority: newTicket.assignedPriority,
                 aiSentimentScore: newTicket.aiSentimentScore,
-                hasOCR: uploadedDocuments.some(doc => doc.ocrExtraction && doc.ocrExtraction.extractedText && !doc.ocrExtraction.extractedText.includes("skipped")),
+                hasOCR: false, // OCR happens later typically
                 isPotentialFraud: newTicket.isPotentialFraud,
                 note: 'Ticket created and initially triaged by AI.'
             }
-        });
+        }, session);
 
-        await auditLog.save({ session });
-
-        // Trigger Notification
         await notificationService.createNotification({
             userId: investorId,
             ticketId: newTicket._id,
@@ -185,7 +124,6 @@ exports.getTickets = async (req, res) => {
             query.investorId = req.user.id;
         }
         
-        // Optional filters
         if (req.query.status) query.status = req.query.status;
         if (req.query.serviceType) query.serviceType = req.query.serviceType;
 
@@ -193,12 +131,8 @@ exports.getTickets = async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
-        const tickets = await Ticket.find(query)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit);
-            
-        const total = await Ticket.countDocuments(query);
+        const tickets = await ticketService.getTicketsByQuery(query, skip, limit);
+        const total = await ticketService.countTicketsByQuery(query);
         
         return res.status(200).json({ 
             tickets,
@@ -216,23 +150,14 @@ exports.getTickets = async (req, res) => {
 
 exports.getTicketById = async (req, res) => {
     try {
-        const ticket = await Ticket.findById(req.params.id);
+        const investorId = (req.user && req.user.role === "INVESTOR") ? req.user.id : null;
+        const ticket = await ticketService.getTicketById(req.params.id, investorId);
 
         if (!ticket) {
-            return res.status(404).json({ message: "Ticket not found" });
+            return res.status(404).json({ message: "Ticket not found or unauthorized access." });
         }
 
-        if (
-            req.user &&
-            req.user.role === "INVESTOR" &&
-            ticket.investorId.toString() !== req.user.id
-        ) {
-            return res.status(403).json({
-                message: "Unauthorized access to this ticket",
-            });
-        }
-
-        const timeline = await AuditLog.find({
+        const timeline = await require('../models/AuditLog').find({
             entityId: ticket._id,
         }).sort({ createdAt: 1 });
 
@@ -254,29 +179,43 @@ exports.addComment = async (req, res) => {
         
         if (!message) return res.status(400).json({ message: "Comment message is required." });
 
-        const ticket = await Ticket.findById(ticketId);
+        let ticket = await ticketService.getTicketById(ticketId);
         if (!ticket) return res.status(404).json({ message: "Ticket not found." });
 
         if (req.user.role === 'INVESTOR' && ticket.investorId.toString() !== req.user.id) {
             return res.status(403).json({ message: "Unauthorized access to this ticket" });
         }
 
+        const finalVisibility = req.user.role === 'INVESTOR' ? 'INVESTOR_ADMIN' : visibility;
+        
         ticket.comments.push({
             authorId: req.user.id,
             authorRole: req.user.role,
             message,
-            visibility: req.user.role === 'INVESTOR' ? 'INVESTOR_ADMIN' : visibility
+            visibility: finalVisibility
         });
-
-        await ticket.save();
         
-        await AuditLog.create({
+        await ticketService.saveTicket(ticket);
+        
+        await auditService.createAuditLog({
             entityId: ticket._id,
             entityType: 'Ticket',
             action: 'COMMENT_ADDED',
             performedBy: req.user.id,
             details: { note: `Comment added by ${req.user.role}` }
         });
+
+        // Use workflow service to notify user if admin commented
+        if (req.user.role.startsWith('ADMIN') && ticket.investorId.toString() !== req.user.id.toString()) {
+            await notificationService.createNotification({
+                userId: ticket.investorId,
+                ticketId: ticket._id,
+                type: 'TICKET_UPDATED',
+                title: 'New Comment on Ticket',
+                message: `An admin has commented on your ticket: ${ticket.title}`,
+                channels: { inApp: true, email: true }
+            });
+        }
 
         return res.status(200).json({ message: "Comment added", comments: ticket.comments });
     } catch (error) {
@@ -290,7 +229,7 @@ exports.resubmitTicket = async (req, res) => {
         const ticketId = req.params.id;
         const files = req.files || [];
 
-        const ticket = await Ticket.findById(ticketId);
+        const ticket = await ticketService.getTicketById(ticketId);
         if (!ticket) return res.status(404).json({ message: "Ticket not found." });
 
         if (req.user.role === 'INVESTOR' && ticket.investorId.toString() !== req.user.id) {
@@ -305,47 +244,8 @@ exports.resubmitTicket = async (req, res) => {
             return res.status(400).json({ message: "New document is required for resubmission." });
         }
 
-        const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
-
-        for (const file of files) {
-            const isPdf = file.mimetype === 'application/pdf';
-            const isImage = file.mimetype.startsWith('image/');
-            
-            if (!isPdf && !isImage) {
-                throw new Error("Invalid file type. Only PDF and images (PNG/JPG) are allowed.");
-            }
-
-            let documentUrl = null;
-            const fileName = `${uuidv4()}-${file.originalname}`;
-            try {
-                await uploadToS3({
-                    Key: fileName,
-                    Body: file.buffer,
-                    ContentType: file.mimetype,
-                });
-                const endpoint = process.env.AWS_ENDPOINT_URL || 'http://localhost:4566';
-                const bucket = process.env.AWS_BUCKET_NAME || 'kfintech-bucket';
-                documentUrl = `${endpoint}/${bucket}/${encodeURIComponent(fileName)}`;
-            } catch (error) {
-                console.error("LocalStack S3 Upload Error:", error.message);
-                throw new Error("Failed to upload document to secure storage.");
-            }
-
-            let ocrExtractedText = null;
-            let ocrMatchVerified = false;
-
-            ticket.documents.push({
-                name: file.originalname,
-                fileType: file.mimetype,
-                size: file.size,
-                s3Key: documentUrl,
-                status: 'PENDING',
-                ocrExtraction: {
-                    extractedText: ocrExtractedText,
-                    matchVerified: ocrMatchVerified
-                }
-            });
-        }
+        const uploadedDocuments = await documentService.uploadDocuments(files);
+        ticket.documents.push(...uploadedDocuments);
 
         // Reset status
         ticket.status = 'OPEN';
@@ -355,9 +255,9 @@ exports.resubmitTicket = async (req, res) => {
         ticket.assignedL1 = null;
         ticket.assignedL2 = null;
 
-        await ticket.save();
+        await ticketService.saveTicket(ticket);
 
-        await AuditLog.create({
+        await auditService.createAuditLog({
             entityId: ticket._id,
             entityType: 'Ticket',
             action: 'TICKET_RESUBMITTED',
@@ -376,7 +276,7 @@ exports.runOcr = async (req, res) => {
     try {
         const { id, docId } = req.params;
         
-        const ticket = await Ticket.findById(id);
+        const ticket = await ticketService.getTicketById(id);
         if (!ticket) return res.status(404).json({ message: "Ticket not found." });
 
         const document = ticket.documents.id(docId);
@@ -407,6 +307,7 @@ exports.runOcr = async (req, res) => {
         let ocrMatchVerified = false;
 
         try {
+            const FormData = require('form-data');
             const formData = new FormData();
             formData.append('account_number', ticket.accountNumber || "");
             formData.append('files', fileBuffer, {
@@ -429,9 +330,9 @@ exports.runOcr = async (req, res) => {
         document.ocrExtraction.extractedText = ocrExtractedText;
         document.ocrExtraction.matchVerified = ocrMatchVerified;
         
-        await ticket.save();
+        await ticketService.saveTicket(ticket);
 
-        await AuditLog.create({
+        await auditService.createAuditLog({
             entityId: ticket._id,
             entityType: 'Ticket',
             action: 'OCR_VERIFICATION_RUN',

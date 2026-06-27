@@ -60,7 +60,11 @@ const UserSchema = new mongoose.Schema({
     resetPasswordToken: String,
     resetPasswordExpires: Date,
     otpCode: String,
-    otpExpires: Date
+    otpExpires: Date,
+    profileCompleted: {
+        type: Boolean,
+        default: false
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);

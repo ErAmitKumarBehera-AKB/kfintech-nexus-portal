@@ -45,7 +45,8 @@ export const AuthProvider = ({ children }) => {
         login,
         verifyOtp,
         logout,
-        getRoleDefaultRoute
+        getRoleDefaultRoute,
+        updateSession
     };
 
     return (

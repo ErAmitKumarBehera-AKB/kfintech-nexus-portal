@@ -4,10 +4,23 @@ import MyTickets from '../components/investor/MyTickets';
 import CreateTicketFlow from '../components/investor/CreateTicketFlow';
 import TicketDetail from '../components/investor/TicketDetail';
 import Profile from '../components/investor/Profile';
+import ProfileCompletionModal from '../components/investor/ProfileCompletionModal';
+import { useAuth } from '../context/AuthContext';
 
 const InvestorDashboard = () => {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('tickets'); // 'tickets' or 'create'
     const [selectedTicketId, setSelectedTicketId] = useState(null);
+
+    const isProfileIncomplete = user?.role === 'INVESTOR' && !user?.profileCompleted;
+
+    const handleTabChange = (tab) => {
+        if (isProfileIncomplete && tab !== 'profile') {
+            return; // Prevent navigating away if incomplete
+        }
+        setActiveTab(tab);
+        setSelectedTicketId(null);
+    };
 
     const renderContent = () => {
         if (selectedTicketId) {
@@ -32,13 +45,16 @@ const InvestorDashboard = () => {
     };
 
     return (
-        <div className="flex h-[calc(100vh-4rem)]">
-            <Sidebar activeTab={activeTab} onTabChange={(tab) => {
-                setActiveTab(tab);
-                setSelectedTicketId(null);
-            }} />
-            <div className="flex-1 overflow-y-auto bg-kfintech-bg p-6">
-                {renderContent()}
+        <div>
+            {isProfileIncomplete && activeTab !== 'profile' && (
+                <ProfileCompletionModal onGoToProfile={() => handleTabChange('profile')} />
+            )}
+            
+            <div>
+                <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
+                <div>
+                    {renderContent()}
+                </div>
             </div>
         </div>
     );
