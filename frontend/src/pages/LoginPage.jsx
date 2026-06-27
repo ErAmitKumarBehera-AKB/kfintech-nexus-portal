@@ -108,7 +108,7 @@ const LoginPage = () => {
                         <p className="text-sm text-gray-500 mb-6">
                             Don't have an account?{' '}
                             <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
-                                Register
+                                Sign Up
                             </Link>
                         </p>
                     )}
@@ -190,7 +190,7 @@ const LoginPage = () => {
                                 />
                             </div>
 
-                            <div className="flex space-x-3">
+                            <div className="flex space-x-3"  >
                                 <button
                                     type="button"
                                     onClick={() => {

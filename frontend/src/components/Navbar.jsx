@@ -31,6 +31,8 @@ const Navbar = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
+    const isLandingPage = location.pathname === "/";
+
     const handleLogout = async () => {
         await logout();
         navigate('/login', { replace: true });
@@ -53,7 +55,7 @@ const Navbar = () => {
                 </div>
 
                 {/* Core Navigation Links — filtered by role */}
-                {navLinks.length > 0 && (
+                {!isLandingPage && navLinks.length > 0 && (
                     <div className="flex items-center gap-1 bg-kfintech-bg/50 p-1.5 rounded-xl border border-kfintech-border relative">
                         {navLinks.map((link) => {
                             const isActive = location.pathname === link.path || location.pathname.startsWith(link.path + '/');
@@ -83,6 +85,7 @@ const Navbar = () => {
                 )}
 
                 {/* Right: Session Indicator + Logout */}
+                {!isLandingPage && (
                 <div className="flex items-center gap-3">
                     {user && (
                         <div className="bg-kfintech-bg border border-kfintech-border px-4 py-2 rounded-lg flex items-center gap-3 shadow-inner">
@@ -110,6 +113,7 @@ const Navbar = () => {
                         </motion.button>
                     )}
                 </div>
+                )}
             </div>
         </nav>
     );

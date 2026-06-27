@@ -29,10 +29,11 @@ const AppRoutes = () => {
 
     return (
         <div className="min-h-screen bg-kfintech-bg font-sans flex flex-col">
+            <Navbar />
             {/* Navbar and Chatbot are only shown when the user is logged in */}
             {isAuthenticated && (
                 <>
-                    <Navbar />
+                    
                     <ChatbotWidget />
                 </>
             )}
