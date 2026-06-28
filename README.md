@@ -60,6 +60,12 @@ graph TD
 
 ---
 
+## 📚 Documentation
+- [API Documentation](API_DOCS.md) - Details all REST and WebSocket endpoints.
+- [Full-Stack Integration Guide](FRONTEND_INTEGRATION_GUIDE.md) - A detailed technical breakdown of the latest zero-touch S3 fetching, Date of Birth AI logic, and frontend modifications (useful for UI/UX teams merging new features).
+
+---
+
 ## 👥 Demo Accounts & Roles
 
 | Email | Password | Role | Dashboard |
