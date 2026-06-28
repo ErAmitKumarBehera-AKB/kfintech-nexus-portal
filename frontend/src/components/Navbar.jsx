@@ -1,8 +1,18 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Activity, User, ShieldCheck, ShieldAlert, LogOut, Crown } from 'lucide-react';
+import { Activity, User, ShieldCheck, ShieldAlert, LogOut, Crown, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const NAV_CONFIG = {
     INVESTOR: [
@@ -19,13 +29,6 @@ const NAV_CONFIG = {
     ]
 };
 
-const ROLE_COLORS = {
-    INVESTOR:    'text-blue-400',
-    ADMIN_L1:    'text-amber-400',
-    ADMIN_L2:    'text-purple-400',
-    ADMIN_SUPER: 'text-emerald-400'
-};
-
 const Navbar = () => {
     const { user, logout } = useAuth();
     const location = useLocation();
@@ -36,80 +39,95 @@ const Navbar = () => {
         navigate('/login', { replace: true });
     };
 
-    // Determine nav links from role; fall back to empty if role unknown
     const navLinks = user ? (NAV_CONFIG[user.role] || []) : [];
-    const roleColor = user ? (ROLE_COLORS[user.role] || 'text-gray-400') : 'text-gray-400';
+    
+    // Get initials for Avatar
+    const getInitials = (name) => {
+        if (!name) return 'U';
+        return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    };
 
     return (
-        <nav className="glass-panel sticky top-0 z-50 border-b border-kfintech-border/50">
-            <div className="container mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-
+        <nav className="sticky top-0 z-50 bg-white border-b border-zinc-200 shadow-sm">
+            <div className="container mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
+                
                 {/* Brand Logo */}
-                <div className="flex items-center gap-3">
-                    <div className="bg-kfintech-primary/10 p-2 rounded-lg border border-kfintech-primary/30">
-                        <Activity className="w-6 h-6 text-kfintech-primary" />
+                <Link to="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80">
+                    <div className="bg-zinc-900 p-1.5 rounded-md flex items-center justify-center">
+                        <Activity className="w-5 h-5 text-white" />
                     </div>
-                    <span className="font-black text-2xl tracking-tighter text-white">KFintech Nexus</span>
-                </div>
+                    <span className="font-bold text-xl tracking-tight text-zinc-900 hidden sm:inline-block">
+                        Nexus
+                    </span>
+                </Link>
 
-                {/* Core Navigation Links — filtered by role */}
+                {/* Core Navigation Links */}
                 {navLinks.length > 0 && (
-                    <div className="flex items-center gap-1 bg-kfintech-bg/50 p-1.5 rounded-xl border border-kfintech-border relative">
+                    <div className="flex items-center gap-1 md:gap-2">
                         {navLinks.map((link) => {
                             const isActive = location.pathname === link.path || location.pathname.startsWith(link.path + '/');
                             return (
-                                <Link
-                                    key={link.path}
-                                    to={link.path}
-                                    className={`relative flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm uppercase tracking-wider transition-colors duration-200 z-10 ${
-                                        isActive ? 'text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
-                                    }`}
-                                >
-                                    {isActive && (
-                                        <motion.div
-                                            layoutId="nav-pill"
-                                            className="absolute inset-0 bg-kfintech-primary rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.5)]"
-                                            initial={false}
-                                            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                                            style={{ zIndex: -1 }}
-                                        />
-                                    )}
-                                    <span className="relative z-10">{link.icon}</span>
-                                    <span className="relative z-10">{link.label}</span>
+                                <Link key={link.path} to={link.path}>
+                                    <Button 
+                                        variant={isActive ? "secondary" : "ghost"} 
+                                        size="sm"
+                                        className={`gap-2 ${isActive ? 'bg-zinc-100 text-zinc-900 font-semibold' : 'text-zinc-600 hover:text-zinc-900'}`}
+                                    >
+                                        {React.cloneElement(link.icon, { className: 'w-4 h-4' })}
+                                        <span className="hidden sm:inline-block">{link.label}</span>
+                                    </Button>
                                 </Link>
                             );
                         })}
                     </div>
                 )}
 
-                {/* Right: Session Indicator + Logout */}
+                {/* Right: User Profile Dropdown */}
                 <div className="flex items-center gap-3">
                     {user && (
-                        <div className="bg-kfintech-bg border border-kfintech-border px-4 py-2 rounded-lg flex items-center gap-3 shadow-inner">
-                            <div className="w-2 h-2 rounded-full bg-kfintech-accent shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
-                            <div className="flex flex-col leading-tight">
-                                <span className="text-xs font-bold text-white">{user.name}</span>
-                                <span className={`text-[10px] font-black font-mono uppercase tracking-widest ${roleColor}`}>
-                                    {user.role}
-                                </span>
-                            </div>
-                        </div>
-                    )}
-
-                    {user && (
-                        <motion.button
-                            id="navbar-logout-btn"
-                            onClick={handleLogout}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all text-sm font-bold uppercase tracking-wider"
-                            title="Sign out"
-                        >
-                            <LogOut className="w-4 h-4" />
-                            <span className="hidden sm:inline">Logout</span>
-                        </motion.button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger className="flex items-center h-9 gap-2 px-2 hover:bg-zinc-100 data-[state=open]:bg-zinc-100 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+                                    <Avatar className="h-7 w-7 border border-zinc-200">
+                                        <AvatarFallback className="bg-zinc-100 text-zinc-700 text-xs font-semibold">
+                                            {getInitials(user.name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="hidden md:flex flex-col items-start leading-none">
+                                        <span className="text-sm font-medium text-zinc-900">{user.name}</span>
+                                    </div>
+                                    <ChevronDown className="h-4 w-4 text-zinc-500 ml-1" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" sideOffset={8} className="w-56 rounded-lg bg-white border border-zinc-200 shadow-md">
+                                <div className="px-2 py-2">
+                                    <div className="flex items-center gap-3 text-left text-sm">
+                                        <Avatar className="h-8 w-8 border border-zinc-200">
+                                            <AvatarFallback className="bg-zinc-100 text-zinc-700 text-xs font-semibold">
+                                                {getInitials(user.name)}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="grid flex-1 text-left text-sm leading-tight">
+                                            <span className="truncate font-medium text-zinc-900">{user.name}</span>
+                                            <span className="truncate text-xs text-zinc-500">{user.email}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <DropdownMenuSeparator className="bg-zinc-100" />
+                                <DropdownMenuItem className="text-xs font-mono text-zinc-500 uppercase cursor-default">
+                                    Role: {user.role.replace('ADMIN_', 'L')}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="bg-zinc-100" />
+                                <DropdownMenuItem 
+                                    onClick={handleLogout}
+                                    className="cursor-pointer text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-600 flex items-center gap-2"
+                                >
+                                    <LogOut className="h-4 w-4" />
+                                    <span>Log out</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     )}
                 </div>
+                
             </div>
         </nav>
     );

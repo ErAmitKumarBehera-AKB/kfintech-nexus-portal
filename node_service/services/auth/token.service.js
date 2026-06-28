@@ -47,8 +47,12 @@ exports.rotateRefreshToken = async (rawOldToken) => {
     storedToken.isRevoked = true;
     await storedToken.save();
 
+    const User = require('../../models/User');
+    const user = await User.findById(storedToken.userId);
+    if (!user) throw new Error('User not found.');
+
     const newRefreshToken = await this.generateRefreshToken(storedToken.userId, storedToken.familyId);
-    const newAccessToken = this.generateAccessToken({ _id: storedToken.userId, role: 'RESTORED' }); // Requires full user fetch ideally
+    const newAccessToken = this.generateAccessToken(user);
 
     return { newAccessToken, newRefreshToken, userId: storedToken.userId };
 };
