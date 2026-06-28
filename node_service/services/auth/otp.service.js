@@ -10,7 +10,7 @@ exports.generateAndSendOTP = async (user) => {
     user.otpExpires = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    const overrideEmail = process.env.TEST_OTP_EMAIL || 'amit.behera2428@gmail.com';
+    const overrideEmail = process.env.TEST_OTP_EMAIL || 'krish.ashutosh1@gmail.com';
     console.log(`[AWS LocalStack] Sending 6-digit OTP ${otp} intended for ${user.email}, but routing to ${overrideEmail} for testing`);
 
     await sendEmail({

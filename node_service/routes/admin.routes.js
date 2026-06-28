@@ -40,4 +40,8 @@ router.get('/tickets/flagged', authenticate, authorize('ADMIN_SUPER'), adminCont
 // SuperAdmin export reports to CSV
 router.get('/reports/export', authenticate, authorize('ADMIN_SUPER'), adminController.exportReports);
 
+// Route: GET /api/admin/agents/activities
+// SuperAdmin track L1/L2 agent activities
+router.get('/agents/activities', authenticate, authorize('ADMIN_SUPER'), adminController.getAgentActivities);
+
 module.exports = router;

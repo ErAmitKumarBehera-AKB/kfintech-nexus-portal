@@ -4,7 +4,6 @@ import { AuthProvider, useAuth, getRoleDefaultRoute } from './context/AuthContex
 
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
-import ChatbotWidget from './components/common/ChatbotWidget';
 
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
@@ -33,7 +32,6 @@ const AppRoutes = () => {
             {isAuthenticated && !location.pathname.startsWith('/investor') && (
                 <>
                     <Navbar />
-                    <ChatbotWidget />
                 </>
             )}
 

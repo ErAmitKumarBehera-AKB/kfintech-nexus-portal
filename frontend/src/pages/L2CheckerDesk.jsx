@@ -19,7 +19,7 @@ const PriorityBadge = ({ priority }) => {
     if (priority === 'CRITICAL') colorClass = "text-red-700 bg-red-50 border-red-200";
     else if (priority === 'HIGH') colorClass = "text-orange-700 bg-orange-50 border-orange-200";
     else if (priority === 'NORMAL') colorClass = "text-blue-700 bg-blue-50 border-blue-200";
-    
+
     return (
         <Badge variant="outline" className={`font-medium h-5 px-1.5 text-[10px] shadow-sm ${colorClass}`}>
             {priority || 'NORMAL'}
@@ -39,25 +39,25 @@ const stripPrefix = (text) => (text || '').replace(/^\[[A-Z_]+\]\s*/, '');
 
 const calculateSLA = (dateString, priority) => {
     if (!dateString) return <span className="text-zinc-400">N/A</span>;
-    
+
     let slaHours = 24;
     if (priority === 'CRITICAL') slaHours = 2;
     else if (priority === 'HIGH') slaHours = 4;
-    
+
     const createdTime = new Date(dateString).getTime();
     const deadline = createdTime + (slaHours * 60 * 60 * 1000);
     const now = new Date().getTime();
     const diffMs = deadline - now;
-    
+
     if (diffMs <= 0) {
         return <span className="text-red-600 font-semibold flex items-center gap-1"><Clock className="w-3 h-3" /> BREACHED</span>;
     }
-    
+
     const diffMins = Math.floor(diffMs / 60000);
     if (diffMins < 60) {
         return <span className="text-amber-600 font-semibold flex items-center gap-1"><Clock className="w-3 h-3" /> {diffMins}m left</span>;
     }
-    
+
     const hours = Math.floor(diffMins / 60);
     const mins = diffMins % 60;
     return <span className="text-zinc-500 font-medium flex items-center gap-1"><Clock className="w-3 h-3" /> {hours}h {mins}m left</span>;
@@ -81,7 +81,7 @@ const L2CheckerDesk = () => {
         if (manual) setIsRefreshing(true);
         else setLoading(true);
         setFetchError(null);
-        
+
         try {
             const response = await apiClient.get(`/l2/tickets?_t=${new Date().getTime()}`, {
                 params: {
@@ -107,7 +107,7 @@ const L2CheckerDesk = () => {
 
     const handleAction = async (action) => {
         if (!selectedTicket) return;
-        
+
         if ((action === 'RETURN_TO_L1' || action === 'REJECT') && !notes.trim()) {
             alert(`Please provide Checker Comments before choosing to ${action === 'REJECT' ? 'Reject' : 'Return to L1'}.`);
             return;
@@ -118,10 +118,10 @@ const L2CheckerDesk = () => {
         }
 
         try {
-            await apiClient.post('/l2/finalize', { 
-                ticketId: selectedTicket._id, 
-                action, 
-                notes 
+            await apiClient.post('/l2/finalize', {
+                ticketId: selectedTicket._id,
+                action,
+                notes
             });
             setQueue(current => current.filter(t => t._id !== selectedTicket._id));
             setSelectedTicket(null);
@@ -149,11 +149,11 @@ const L2CheckerDesk = () => {
                             <ShieldCheck className="h-4 w-4 text-zinc-500" />
                             L2 Verification
                         </h2>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => fetchQueue(true)} 
-                            className={`h-7 w-7 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200 ${isRefreshing ? 'animate-spin' : ''}`} 
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => fetchQueue(true)}
+                            className={`h-7 w-7 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200 ${isRefreshing ? 'animate-spin' : ''}`}
                             title="Refresh Queue"
                             disabled={loading || isRefreshing}
                         >
@@ -164,8 +164,8 @@ const L2CheckerDesk = () => {
                     <div className="space-y-3">
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
-                            <Input 
-                                type="text" placeholder="Search reference..." 
+                            <Input
+                                type="text" placeholder="Search reference..."
                                 value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
                                 className="pl-8 h-8 text-xs bg-white border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus-visible:ring-1 focus-visible:ring-zinc-300 shadow-sm rounded-md transition-colors"
                             />
@@ -201,19 +201,18 @@ const L2CheckerDesk = () => {
                                 </motion.div>
                             ) : (
                                 queue.map((ticket, i) => (
-                                    <motion.div 
+                                    <motion.div
                                         layout
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, scale: 0.95 }}
                                         transition={{ delay: i * 0.02, duration: 0.2 }}
-                                        key={ticket._id} 
+                                        key={ticket._id}
                                         onClick={() => { setSelectedTicket(ticket); setNotes(''); }}
-                                        className={`group relative p-3 mb-2 cursor-pointer transition-all duration-200 rounded-lg border ${
-                                            selectedTicket?._id === ticket._id 
-                                                ? 'bg-white border-zinc-300 shadow-md ring-1 ring-zinc-900/5' 
+                                        className={`group relative p-3 mb-2 cursor-pointer transition-all duration-200 rounded-lg border ${selectedTicket?._id === ticket._id
+                                                ? 'bg-white border-zinc-300 shadow-md ring-1 ring-zinc-900/5'
                                                 : 'bg-transparent border-transparent hover:bg-zinc-100 hover:border-zinc-200'
-                                        }`}
+                                            }`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
                                             <span className="text-[11px] font-mono font-semibold text-zinc-500">#{ticket._id.substring(ticket._id.length - 8).toUpperCase()}</span>
@@ -252,13 +251,13 @@ const L2CheckerDesk = () => {
             <main className={`h-full flex-1 flex flex-col relative bg-zinc-50 min-h-0 overflow-hidden ${!selectedTicket ? 'hidden md:flex' : 'flex'}`}>
                 {/* Mobile Back Button */}
                 <div className="md:hidden border-b border-zinc-100 p-2 bg-zinc-50">
-                     <Button variant="ghost" size="sm" onClick={() => setSelectedTicket(null)} className="text-zinc-600 h-8 hover:bg-zinc-200">
-                          <ChevronLeft className="h-4 w-4 mr-1" /> Back
-                     </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedTicket(null)} className="text-zinc-600 h-8 hover:bg-zinc-200">
+                        <ChevronLeft className="h-4 w-4 mr-1" /> Back
+                    </Button>
                 </div>
 
                 {selectedTicket ? (
-                    <motion.div 
+                    <motion.div
                         key={selectedTicket._id}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -289,7 +288,7 @@ const L2CheckerDesk = () => {
                                         {stripPrefix(selectedTicket.description || selectedTicket.title)}
                                     </h1>
                                 </div>
-                                
+
                                 {selectedTicket.isPotentialFraud && (
                                     <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-900 shadow-sm rounded-lg">
                                         <AlertTriangle className="h-5 w-5 text-red-600" />
@@ -308,7 +307,7 @@ const L2CheckerDesk = () => {
                                         <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Hash className="h-3 w-3" /> Account</p>
                                         <p className="text-sm font-mono font-medium text-zinc-900">{selectedTicket.accountNumber || 'Not Provided'}</p>
                                     </div>
-                                    
+
                                     {/* Service Metadata */}
                                     {selectedTicket.serviceMetadata && Object.keys(selectedTicket.serviceMetadata).length > 0 && (() => {
                                         const stConfig = getServiceType(selectedTicket.serviceType);
@@ -340,9 +339,9 @@ const L2CheckerDesk = () => {
                                                         <div className="flex items-center justify-between gap-4 mb-2">
                                                             <p className="text-sm font-semibold text-zinc-900 truncate pr-4">{doc.name}</p>
                                                             {doc.s3Key && (
-                                                                <a 
-                                                                    href={doc.s3Key} 
-                                                                    target="_blank" 
+                                                                <a
+                                                                    href={doc.s3Key}
+                                                                    target="_blank"
                                                                     rel="noreferrer"
                                                                     className="text-xs font-semibold text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50 px-2 py-1 rounded"
                                                                 >
@@ -355,7 +354,7 @@ const L2CheckerDesk = () => {
                                                                 {doc.status}
                                                             </Badge>
                                                         </div>
-                                                        
+
                                                         {doc.ocrExtraction ? (
                                                             <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 mt-2 shadow-inner">
                                                                 <p className={`text-xs font-bold flex items-center gap-1.5 mb-2 ${doc.ocrExtraction.matchVerified ? 'text-emerald-700' : 'text-red-700'}`}>
@@ -386,7 +385,7 @@ const L2CheckerDesk = () => {
                         <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-zinc-200 p-4 pb-6 z-20 shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.08)]">
                             <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-end gap-4">
                                 <div className="flex-1 w-full">
-                                    <Input 
+                                    <Input
                                         placeholder="Add mandatory checker comments for rejection or return..."
                                         value={notes}
                                         onChange={(e) => setNotes(e.target.value)}
@@ -394,25 +393,25 @@ const L2CheckerDesk = () => {
                                     />
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto bg-zinc-50 p-1 rounded-lg border border-zinc-200 shadow-inner">
-                                    <Button 
-                                        variant="ghost" 
+                                    <Button
+                                        variant="ghost"
                                         size="sm"
-                                        onClick={() => handleAction('RETURN_TO_L1')} 
+                                        onClick={() => handleAction('RETURN_TO_L1')}
                                         className="h-9 px-4 text-xs font-bold text-amber-700 hover:text-amber-800 hover:bg-white hover:shadow-sm transition-all"
                                     >
                                         Return to L1
                                     </Button>
-                                    <Button 
-                                        variant="ghost" 
+                                    <Button
+                                        variant="ghost"
                                         size="sm"
-                                        onClick={() => handleAction('REJECT')} 
+                                        onClick={() => handleAction('REJECT')}
                                         className="h-9 px-4 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-white hover:shadow-sm transition-all"
                                     >
                                         Reject
                                     </Button>
-                                    <Button 
+                                    <Button
                                         size="sm"
-                                        onClick={() => handleAction('APPROVE')} 
+                                        onClick={() => handleAction('APPROVE')}
                                         className="h-9 px-5 text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-white rounded shadow-sm transition-all"
                                     >
                                         Approve

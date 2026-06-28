@@ -64,9 +64,9 @@ exports.verifyInvestorDocument = async (req, res) => {
                 Body: file.buffer,
                 ContentType: file.mimetype,
             });
-            const endpoint = process.env.AWS_ENDPOINT_URL || 'http://localhost:4566';
-            const bucket = process.env.AWS_BUCKET_NAME || 'kfintech-bucket';
-            documentUrl = `${endpoint}/${bucket}/${encodeURIComponent(fileName)}`;
+           const endpoint =  process.env.PUBLIC_S3_URL || "http://localhost:4566";
+           const bucket = process.env.AWS_BUCKET_NAME || "kfintech-bucket";
+           documentUrl = `${endpoint}/${bucket}/${encodeURIComponent(fileName)}`;
         } catch (s3Error) {
             console.error("LocalStack S3 Upload Error:", s3Error.message);
         }
@@ -230,6 +230,36 @@ exports.getSystemMetrics = async (req, res) => {
         ]);
         const statusData = statusDataRaw.map(item => ({ name: item._id || 'UNKNOWN', value: item.count }));
 
+        // Agent Performance Metrics (Top performing L1/L2 agents in last 30 days)
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const agentActivityRaw = await AuditLog.aggregate([
+            { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "performedBy",
+                    foreignField: "_id",
+                    as: "user"
+                }
+            },
+            { $unwind: "$user" },
+            { $match: { "user.role": { $in: ["ADMIN_L1", "ADMIN_L2"] } } },
+            {
+                $group: {
+                    _id: { userId: "$user._id", name: "$user.name", role: "$user.role" },
+                    actionsCount: { $sum: 1 }
+                }
+            },
+            { $sort: { actionsCount: -1 } },
+            { $limit: 10 }
+        ]);
+        
+        const agentPerformance = agentActivityRaw.map(item => ({
+            name: item._id.name,
+            role: item._id.role,
+            actionsCount: item.actionsCount
+        }));
+
         return res.status(200).json({
             totalTickets,
             totalInvestors,
@@ -238,7 +268,8 @@ exports.getSystemMetrics = async (req, res) => {
             openTickets,
             slaBreachedTickets,
             serviceTypeData,
-            statusData
+            statusData,
+            agentPerformance
         });
     } catch (err) {
         return res.status(500).json({ error: err.message });
@@ -398,6 +429,36 @@ exports.updateUserStatus = async (req, res) => {
         await auditLog.save();
 
         return res.status(200).json({ message: "User status updated successfully", user });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+};
+
+// SuperAdmin Endpoint: Agent Activities
+exports.getAgentActivities = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+
+        // Fetch logs where performedBy is populated and user role is L1/L2
+        // To do this efficiently without complex aggregation, we can query AuditLog 
+        // and populate User, then filter. Or we query Users first.
+        const adminUsers = await User.find({ role: { $in: ['ADMIN_L1', 'ADMIN_L2'] } }).select('_id');
+        const adminIds = adminUsers.map(u => u._id);
+
+        const logs = await AuditLog.find({ performedBy: { $in: adminIds } })
+            .populate('performedBy', 'name role email')
+            .populate('entityId', 'ticketId serviceType') // Assuming entity is Ticket for these actions
+            .sort({ createdAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit);
+
+        const total = await AuditLog.countDocuments({ performedBy: { $in: adminIds } });
+
+        return res.status(200).json({
+            activities: logs,
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+        });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
