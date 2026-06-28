@@ -7,7 +7,7 @@ Welcome to the **KFintech AI Models API**. This documentation provides the exact
 The API exposes four primary AI capabilities:
 1. **Priority & Fraud Triage** using the industry-standard `ProsusAI/finbert` model.
 2. **Zero-Touch Document Verification** using Microsoft Florence-2 Vision OCR with advanced fuzzy matching.
-3. **Structured AI Summarizer** backed by a Qwen2.5-1.5B LLM engine (Mock Mode for lightweight deployment).
+3. **Structured AI Summarizer** backed by a Llama-3.2-3B-Instruct LLM engine (Mock Mode for lightweight deployment).
 4. **Private Voice Transcription** using OpenAI's Whisper-Tiny for in-browser audio processing.
 
 > [!NOTE]
@@ -104,7 +104,7 @@ curl -X POST "http://localhost:8000/ocr/verify-account" \
 
 ---
 
-## 3. AI Summarizer (Qwen2.5-1.5B / Mock Mode)
+## 3. AI Summarizer (Llama-3.2-3B-Instruct / Mock Mode)
 
 A highly compliant AI summarization endpoint. It passes the user's grievance to the LLM engine and enforces a strict structured format. It guarantees that the output contains exactly 3 concise bullet points formatted as parseable JSON.
 
@@ -138,7 +138,7 @@ A highly compliant AI summarization endpoint. It passes the user's grievance to 
 
 ---
 
-## 4. AI Chatbot (RAG + Qwen2.5-1.5B / Mock Mode)
+## 4. AI Chatbot (RAG + Llama-3.2-3B-Instruct / Mock Mode)
 
 General-purpose chatbot endpoint for investor queries. Retrieves relevant context from ChromaDB vector store and generates contextual responses.
 

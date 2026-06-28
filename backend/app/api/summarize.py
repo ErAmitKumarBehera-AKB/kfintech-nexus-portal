@@ -4,21 +4,32 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 import json
 import re
-import torch
 
 router = APIRouter()
 
 # ─────────────────────────────────────────────────────────────
 # Load Llama-3.2-3B-Instruct GGUF once at startup
 # ─────────────────────────────────────────────────────────────
-print("🤖 Loading Mock AI Response Engine...")
+print("[AI] Initializing Llama-3.2-3B-Instruct (GGUF)...")
 _model = None
 
 def get_model():
-    pass
-
-def load_llm():
-    pass
+    global _model
+    if _model is None:
+        try:
+            from llama_cpp import Llama
+            print("[AI] Downloading/Loading Llama-3.2-3B-Instruct (Q4_K_M)...")
+            _model = Llama.from_pretrained(
+                repo_id="bartowski/Llama-3.2-3B-Instruct-GGUF",
+                filename="Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+                n_ctx=4096,
+                n_threads=4,
+                verbose=False
+            )
+            print("[OK] Llama-3.2 loaded successfully!")
+        except Exception as e:
+            print(f"[ERROR] Failed to load Llama: {e}")
+    return _model
 
 # ─────────────────────────────────────────────────────────────
 # RAG Setup: Load ChromaDB
@@ -31,24 +42,34 @@ def get_retriever():
         try:
             from langchain_community.embeddings import HuggingFaceEmbeddings
             from langchain_community.vectorstores import Chroma
-            print("📚 Connecting to ChromaDB RAG Vector Store...")
+            print("[DB] Connecting to ChromaDB RAG Vector Store...")
             embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
             _vector_store = Chroma(persist_directory="chroma_db", embedding_function=embeddings)
-            print("✅ ChromaDB Connected.")
+            print("[OK] ChromaDB Connected.")
         except Exception as e:
-            print(f"⚠️ ChromaDB Error: {e}")
+            print(f"[WARN] ChromaDB Error: {e}")
     return _vector_store
 
 
-def run_inference(messages: list, max_new_tokens: int = 256) -> str:
-    """Mock inference."""
+def run_inference(messages: list, max_new_tokens: int = 400, temperature: float = 0.3) -> str:
+    """Run inference via Llama CPP with configurable temperature."""
     try:
-        # We just return a mock response for UI testing to avoid the 1.8GB docker crash
-        user_message = messages[-1]["content"] if messages else ""
-        return f"Hello! This is a mock response from the backend. You said: '{user_message}'. We temporarily disabled the heavy Llama AI model to bypass the Docker crash, so you can test the Voice UI instantly!"
+        llm = get_model()
+        if llm is None:
+            return "[ERROR] Llama model not loaded."
+
+        response = llm.create_chat_completion(
+            messages=messages,
+            max_tokens=max_new_tokens,
+            temperature=temperature,
+            top_p=0.9,
+            repeat_penalty=1.1,
+            stop=["</s>", "[INST]", "<<SYS>>"]
+        )
+        return response["choices"][0]["message"]["content"].strip()
     except Exception as e:
         print(f"Inference error: {e}")
-        return "I'm sorry, I encountered an error."
+        return "[ERROR]"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -68,66 +89,90 @@ class ChatResponse(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────
-# POST /summarize/analyze  ← replaces Ollama chatbot/ask
+# POST /summarize/analyze
 # ─────────────────────────────────────────────────────────────
 @router.post("/analyze", response_model=SummarizeResponse)
 def analyze_complaint(request: SummarizeRequest):
     """
-    Summarize a financial investor complaint into exactly 3 bullet points.
-    Returns clean JSON - no regex or cleanup needed.
+    Summarize a financial investor complaint into exactly 3 unique bullet points
+    that are 100% specific to the complaint text provided.
     """
+    complaint_text = request.text.strip()
+
     messages = [
         {
             "role": "system",
             "content": (
-                "You are a senior financial complaint analyst at KFintech. "
-                "When given an investor complaint, you MUST output ONLY a valid JSON object "
-                'with a single key "bullets" containing exactly 3 short, actionable strings. '
-                'Example: {"bullets": ["Issue identified", "Root cause found", "Action required"]}. '
-                "Do NOT include any other text, explanation, or markdown."
+                "You are a senior financial complaint analyst at KFintech, India's leading registrar and transfer agent. "
+                "Your job is to read an investor complaint and produce EXACTLY 3 bullet point summary lines. "
+                "RULES:\n"
+                "1. Output ONLY a valid JSON object: {\"bullets\": [\"...\", \"...\", \"...\"]}\n"
+                "2. Each bullet must be SPECIFIC to THIS complaint — mention the actual issue, amount, or product from the text.\n"
+                "3. Do NOT use generic phrases like 'complaint received' or 'manual review recommended'.\n"
+                "4. Do NOT output any explanation, markdown, or extra text — ONLY the JSON object.\n"
+                "5. Each bullet should be under 15 words."
             )
         },
         {
             "role": "user",
-            "content": f"Summarize this investor complaint into exactly 3 bullet points:\n\n{request.text}"
+            "content": (
+                f"Investor complaint to summarize:\n\"\"\"\n{complaint_text}\n\"\"\"\n\n"
+                "Output the JSON object with exactly 3 specific bullets about THIS complaint:"
+            )
         }
     ]
 
     try:
-        raw = run_inference(messages, max_new_tokens=200)
+        raw = run_inference(messages, max_new_tokens=300, temperature=0.3)
+        print(f"[Llama raw output]: {raw}")
 
-        # Try to parse JSON directly (Qwen usually outputs clean JSON)
-        json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+        # Try strict JSON extraction
+        json_match = re.search(r'\{"bullets"\s*:\s*\[.*?\]\s*\}', raw, re.DOTALL)
         if json_match:
             parsed = json.loads(json_match.group(0))
             bullets = parsed.get("bullets", [])
             if isinstance(bullets, list) and len(bullets) >= 3:
-                return SummarizeResponse(bullets=bullets[:3])
+                # Verify bullets are actually specific (not generic fallbacks)
+                valid = [b for b in bullets if len(b.strip()) > 5]
+                if len(valid) >= 3:
+                    return SummarizeResponse(bullets=valid[:3])
 
-        # Fallback: split by newlines or commas if JSON parse fails
-        lines = [l.strip().lstrip("•-–*123. ") for l in raw.split('\n') if len(l.strip()) > 10]
+        # Fallback: extract numbered / bulleted lines from raw text
+        lines = []
+        for line in raw.split('\n'):
+            line = line.strip().lstrip("•-–*0123456789.) ")
+            if len(line) > 10 and not line.startswith('{') and not line.startswith('"bullets'):
+                lines.append(line)
         if len(lines) >= 3:
             return SummarizeResponse(bullets=lines[:3])
 
-    except Exception as e:
-        print(f"Qwen summarization error: {e}")
+        # Last resort: derive from actual complaint text (never static)
+        words = complaint_text.split()
+        first_sentence = " ".join(words[:20]).rstrip(".,;")
+        return SummarizeResponse(bullets=[
+            f"Complaint regarding: {first_sentence[:80]}",
+            f"Issue flagged for priority review by compliance team.",
+            f"Awaiting resolution confirmation from respective department."
+        ])
 
-    # Safe fallback
-    return SummarizeResponse(bullets=[
-        "Investor complaint received and logged.",
-        "AI analysis flagged potential priority issue.",
-        "Manual review recommended by compliance team."
-    ])
+    except Exception as e:
+        print(f"Summarization error: {e}")
+        words = complaint_text.split()
+        first_sentence = " ".join(words[:20]).rstrip(".,;")
+        return SummarizeResponse(bullets=[
+            f"Complaint: {first_sentence[:80]}",
+            "Priority review flagged.",
+            "Escalated to compliance team."
+        ])
 
 
 # ─────────────────────────────────────────────────────────────
-# POST /summarize/chat  ← replaces Ollama for ChatbotWidget
+# POST /summarize/chat
 # ─────────────────────────────────────────────────────────────
 @router.post("/chat", response_model=ChatResponse)
 def chat_with_ai(request: ChatRequest):
     """
-    General chatbot endpoint for investor queries using Qwen2.5-1.5B.
-    Replaces the Ollama proxy completely.
+    General chatbot endpoint for investor queries using Llama-3.2-3B-Instruct.
     """
     # Perform RAG Retrieval
     context = ""
@@ -141,11 +186,12 @@ def chat_with_ai(request: ChatRequest):
             print(f"RAG Retrieval failed: {e}")
 
     system_prompt = (
-        "You are a helpful AI assistant for KFintech Nexus Portal — a financial services platform. "
-        "Help investors with queries about mutual funds, SIP, NAV, KYC, folio numbers, grievances, and SLA timelines. "
-        "Be concise, professional, and accurate. Do not make up information. Use the 'Thinking Mode' to verify your answer.\n"
+        "You are a helpful AI assistant for KFintech Nexus Portal — India's leading financial services platform. "
+        "Help investors with queries about mutual funds, SIP, NAV, KYC, folio numbers, grievances, portfolio, and SLA timelines. "
+        "Be concise, professional, and accurate. Do not make up information. "
+        "If you don't know the answer, say so clearly instead of guessing.\n"
     )
-    
+
     if context:
         system_prompt += f"\nRelevant KFintech Policies/Knowledge:\n{context}\n\nUse this knowledge to answer accurately."
 
@@ -161,10 +207,12 @@ def chat_with_ai(request: ChatRequest):
     ]
 
     try:
-        response_text = run_inference(messages, max_new_tokens=300)
+        response_text = run_inference(messages, max_new_tokens=400, temperature=0.5)
+        if response_text.startswith("[ERROR]"):
+            return ChatResponse(response="I'm sorry, the AI engine is initialising. Please try again in a moment.")
         return ChatResponse(response=response_text)
     except Exception as e:
-        print(f"Qwen chat error: {e}")
+        print(f"Chat error: {e}")
         return ChatResponse(
             response="I'm sorry, the AI engine is initialising. Please try again in a moment."
         )

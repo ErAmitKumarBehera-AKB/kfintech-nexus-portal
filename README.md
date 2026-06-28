@@ -20,10 +20,10 @@ Nexus securely orchestrates ticket creation, AI-powered sentiment analysis, LLM-
 
 ### 🌟 High-Impact Capabilities
 - **Proactive Fraud & Threat Detection (FinBERT):** Instantly analyzes the sentiment of incoming complaints. Calculates a robust **Frustration Index** and actively scans for keywords like "scam", "hacked", or "stolen". It triggers a **⚠️ POTENTIAL FRAUD** flag and auto-escalates the ticket to **CRITICAL** priority.
-- **Strictly Formatted Summarization (Qwen2.5-1.5B / Mock Engine):** Distills multi-paragraph, emotional complaints into exactly 3 structured, actionable JSON bullet points. Built-in hallucination guardrails reduce agent reading time by 80% with 100% output reliability. *(Runs in lightweight Mock Mode by default to prevent OOM on resource-constrained systems; swap in a live LLM via environment config.)*
+- **Strictly Formatted Summarization (Llama-3.2-3B-Instruct / Mock Engine):** Distills multi-paragraph, emotional complaints into exactly 3 structured, actionable JSON bullet points. Built-in hallucination guardrails reduce agent reading time by 80% with 100% output reliability. *(Runs in lightweight Mock Mode by default to prevent OOM on resource-constrained systems; swap in a live LLM via environment config.)*
 - **Advanced Zero-Touch Document Verification (Florence-2 Vision OCR):** Powered by Microsoft's `Florence-2-base` vision transformer model. Automatically scans uploaded KYC/supporting documents (even noisy/blurry ones). Uses mathematical sequence matching (`difflib`) and regex normalization to fuzzy-match extracted account numbers against the claim, tolerating up to a 15% discrepancy in character recognition. *(Runs in Mock Mode by default; real model loads when GPU memory is sufficient.)*
 - **Private Voice AI (Whisper Tiny):** OpenAI's Whisper-Tiny model transcribes investor voice notes directly inside the browser — no data ever leaves the server.
-- **AI Chatbot Assistant:** A RAG-powered chatbot for investors, backed by ChromaDB vector search + the Qwen LLM engine. Answers KYC, SIP, NAV, and grievance SLA queries in natural language.
+- **AI Chatbot Assistant:** A RAG-powered chatbot for investors, backed by ChromaDB vector search + the Llama-3.2-3B-Instruct LLM engine. Answers KYC, SIP, NAV, and grievance SLA queries in natural language.
 - **Super Admin Control Center:** Live system health monitoring (MongoDB, LocalStack, AI Engine), interactive RBAC user management, a scrolling audit trail, and an Emergency Kill Switch to revoke all active sessions platform-wide.
 - **Adaptive Hardware Acceleration:** Seamlessly detects underlying system architecture (`torch.cuda.is_available()`). Runs blazing-fast parallel inference on NVIDIA GPUs, or gracefully degrades to optimized CPU mode.
 - **Strict Compliance Workflows:** Enforces Maker-Checker (L1/L2) governance via ACID-compliant MongoDB transactions, ensuring no single actor can approve sensitive resolutions.
@@ -43,7 +43,7 @@ graph TD
     C -->|Saves Document & Alerts| E((AWS LocalStack S3/SES/SNS))
     C -->|Requests AI Analysis| F[FastAPI AI Engine]
     F -->|Sentiment & Fraud| G(FinBERT)
-    F -->|Structured JSON Summary| H(Qwen2.5-1.5B LLM)
+    F -->|Structured JSON Summary| H(Llama-3.2-3B-Instruct LLM)
     F -->|Vision OCR Extraction| I(Florence-2 Vision OCR)
     F -->|Voice Transcription| V(Whisper Tiny)
     F -.->|JSON Results| C

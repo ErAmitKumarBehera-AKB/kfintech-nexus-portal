@@ -3,7 +3,7 @@
 Welcome! Thank you for your interest in contributing to the **KFintech Nexus Portal**, an AI-driven, enterprise-grade grievance management system. We are actively expanding this project for our upcoming hackathon presentation and value high-impact contributions that drive **business efficiency, AI accuracy, and system scalability.**
 
 ## 🎯 Our Hackathon Vision
-Our goal is to demonstrate how unstructured, complex investor grievances can be fully automated using LLMs (Qwen2.5-1.5B), NLP (FinBERT), Computer Vision (Florence-2 Vision OCR), and Voice AI (Whisper). Contributions should align with these core objectives:
+Our goal is to demonstrate how unstructured, complex investor grievances can be fully automated using LLMs (Llama-3.2-3B-Instruct), NLP (FinBERT), Computer Vision (Florence-2 Vision OCR), and Voice AI (Whisper). Contributions should align with these core objectives:
 1. **Minimizing Human Touch-Points:** Automating triage, sentiment scoring, and summarization.
 2. **Zero-Trust Compliance:** Strict Maker-Checker (L1/L2) workflows and immutable audit logs via the Super Admin Control Center.
 3. **Enterprise Scalability:** Ensuring the Dockerized microservices can scale effectively in both GPU and CPU deployment modes.
@@ -39,7 +39,7 @@ Our goal is to demonstrate how unstructured, complex investor grievances can be 
 - **Testing:** Verify your changes work in both GPU and CPU Docker Compose modes before submitting.
 
 ## 🏗️ Architecture Notes
-- **AI Models:** FinBERT (sentiment), Florence-2 (OCR), Whisper-Tiny (voice), Qwen2.5-1.5B (summarization/chat) — all run in Mock Mode by default for lightweight deployment.
+- **AI Models:** FinBERT (sentiment), Florence-2 (OCR), Whisper-Tiny (voice), Llama-3.2-3B-Instruct (summarization/chat) — all run in Mock Mode by default for lightweight deployment.
 - **Frontend:** React + Vite + TailwindCSS + Framer Motion. 4 role-based dashboards (Investor, L1 Maker, L2 Checker, Super Admin).
 - **Backend:** Node.js/Express orchestrator + FastAPI AI microservice + MongoDB ReplicaSet + AWS LocalStack.
 

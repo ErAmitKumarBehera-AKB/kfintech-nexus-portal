@@ -35,8 +35,26 @@ const generateDownloadUrl = async (fileName) => {
   });
 };
 
+// Download File as Buffer
+const downloadFromS3 = async (fileName) => {
+  const command = new GetObjectCommand({
+    Bucket: AWS_BUCKET_NAME,
+    Key: fileName,
+  });
+  
+  const response = await s3.send(command);
+  
+  // Convert stream to buffer
+  const chunks = [];
+  for await (const chunk of response.Body) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+};
+
 module.exports = {
   uploadToS3,
   deleteFromS3,
   generateDownloadUrl,
+  downloadFromS3,
 };

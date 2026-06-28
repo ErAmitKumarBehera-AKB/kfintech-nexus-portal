@@ -6,6 +6,33 @@ const AuditLog = require('../models/AuditLog');
 const FormData = require('form-data');
 const { v4: uuidv4 } = require("uuid");
 const { uploadToS3 } = require('../services/s3Service');
+const InvestorProfile = require('../models/InvestorProfile');
+
+// GET /api/tickets — investor sees own tickets, admins see all
+exports.getTickets = async (req, res) => {
+    try {
+        const { role, userId } = req.user;
+        let query = {};
+        // Investors only see their own tickets
+        if (role === 'INVESTOR') query.investorId = userId;
+
+        const tickets = await Ticket.find(query).sort({ createdAt: -1 }).lean();
+        return res.status(200).json({ tickets, total: tickets.length });
+    } catch (err) {
+        return res.status(500).json({ message: 'Failed to fetch tickets.', error: err.message });
+    }
+};
+
+// GET /api/tickets/:id — get a single ticket
+exports.getTicketById = async (req, res) => {
+    try {
+        const ticket = await Ticket.findById(req.params.id).lean();
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found.' });
+        return res.status(200).json({ ticket });
+    } catch (err) {
+        return res.status(500).json({ message: 'Failed to fetch ticket.', error: err.message });
+    }
+};
 
 exports.createTicket = async (req, res) => {
     // 1. Extract data
@@ -43,37 +70,23 @@ exports.createTicket = async (req, res) => {
             console.error("FinBERT Error:", error.message);
         }
 
-        // --- B. Ollama Insight Summary ---
+        // --- B. Llama-3.2 Insight Summary ---
         let aiSummary = [];
         try {
-            const chatResponse = await axios.post(`${mlServiceUrl}/chatbot/ask`, { 
-                question: `Summarize this investor complaint into exactly 3 short bullet points. Provide the output ONLY as a JSON object with a single key "bullets" containing an array of exactly 3 strings. Example: {"bullets": ["point 1", "point 2", "point 3"]}. Do not include any other text. Complaint: ${complaintText}`,
-                format: 'json'
+            const chatResponse = await axios.post(`${mlServiceUrl}/summarize/analyze`, { 
+                text: complaintText 
             });
-            const rawResponse = chatResponse.data.response;
             
-            // Aggressive string cleanup to extract the actual sentences
-            // Find all substrings that look like sentences (ignoring JSON brackets/braces/keys)
-            const cleanedMatches = rawResponse.match(/(?:"|')([^"']{15,})(?:"|')/g);
+            aiSummary = chatResponse.data.bullets || [];
             
-            if (cleanedMatches && cleanedMatches.length > 0) {
-                aiSummary = cleanedMatches
-                    .map(s => s.replace(/["']/g, '').trim())
-                    .filter(s => !s.toLowerCase().includes("bullets") && s.length > 10);
-            } else {
-                // Absolute fallback: just strip all JSON chars
-                let stripped = rawResponse.replace(/[\*"{}\[\]\\]/g, '').replace(/bullets:/gi, '').trim();
-                aiSummary = stripped.split(',').map(s => s.trim()).filter(s => s.length > 5);
-            }
-                
             // Truncate strictly to 3 bullets
             if (aiSummary.length > 3) aiSummary = aiSummary.slice(0, 3);
             if (aiSummary.length === 0) {
                 aiSummary = ["Requires manual review.", "AI summary extraction failed.", "Sentiment flags potential issue."];
             }
         } catch (error) {
-            console.error("Ollama Error:", error.message);
-            aiSummary = ["Ollama AI Engine not reachable.", "Using default static insights.", "Sentiment flags potential churn."];
+            console.error("Llama Error:", error.message);
+            aiSummary = ["Llama AI Engine not reachable.", "Using default static insights.", "Sentiment flags potential churn."];
         }
 
         // --- C. EasyOCR Extraction ---
@@ -83,6 +96,15 @@ exports.createTicket = async (req, res) => {
             try {
                 const formData = new FormData();
                 formData.append('account_number', accountNumber);
+                formData.append('investor_name', investorName || '');
+                
+                // Fetch DOB from InvestorProfile to pass for verification
+                const profile = await InvestorProfile.findOne({ userId: investorId }).lean();
+                if (profile && profile.dateOfBirth) {
+                    const dob = new Date(profile.dateOfBirth).toISOString().split('T')[0];
+                    formData.append('dob', dob);
+                }
+
                 formData.append('file', file.buffer, {
                     filename: file.originalname,
                     contentType: file.mimetype,
@@ -93,7 +115,7 @@ exports.createTicket = async (req, res) => {
                 });
                 
                 ocrExtractedText = ocrRes.data.extracted_text.join('\n');
-                ocrMatchVerified = ocrRes.data.account_found;
+                ocrMatchVerified = ocrRes.data.all_details_found;
             } catch (error) {
                 console.error("EasyOCR Error:", error.message);
                 ocrExtractedText = "OCR Processing Failed: " + error.message;

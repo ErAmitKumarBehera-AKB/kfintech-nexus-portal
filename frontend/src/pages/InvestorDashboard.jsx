@@ -402,22 +402,17 @@ const InvestorDashboard = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div>
                                         <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-widest">Investor Name</label>
-                                        <select name="investorName" value={formData.investorName}
+                                        <input type="text" name="investorName" required value={formData.investorName}
                                             onChange={handleChange}
-                                            className={`${inputClass} cursor-pointer`}>
-                                            <option value="Amit">Amit (Perfect OCR Match)</option>
-                                            <option value="John Doe">John Doe (Failure Test)</option>
-                                            <option value="Jane Smith">Jane Smith (Failure Test)</option>
-                                        </select>
+                                            placeholder="Enter your name"
+                                            className={inputClass} />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-widest">Account Number</label>
-                                        <select name="accountNumber" value={formData.accountNumber}
+                                        <input type="text" name="accountNumber" required value={formData.accountNumber}
                                             onChange={handleChange}
-                                            className={`${inputClass} cursor-pointer`}>
-                                            <option value="9876543210">9876543210 (Perfect OCR Match)</option>
-                                            <option value="1111111111">1111111111 (Failure Test)</option>
-                                        </select>
+                                            placeholder="Enter account number"
+                                            className={inputClass} />
                                     </div>
                                 </div>
                             </div>

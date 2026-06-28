@@ -1,8 +1,8 @@
 import os
 from PIL import Image, ImageDraw
 
-def create_ocr_test_image():
-    print("Generating crisp, OCR-ready test document...")
+def create_ocr_test_image(name, account_number, filename):
+    print(f"Generating crisp, OCR-ready test document for {name}...")
     
     # 1. Create a high-resolution crisp white canvas (800x1000 pixels)
     width, height = 800, 1000
@@ -21,7 +21,7 @@ def create_ocr_test_image():
         "--------------------------------------------------",
         "INVESTOR PROFILE DETAILS:",
         "--------------------------------------------------",
-        "INVESTOR NAME: AMIT SHARMA",
+        f"INVESTOR NAME: {name.upper()}",
         "FOLIO NUMBER: FL-99482011A",
         "ACCOUNT HOLDER STATUS: PRIMARY RESIDENT",
         "",
@@ -29,7 +29,7 @@ def create_ocr_test_image():
         "REQUESTED CHANGES FOR FUTURE DIVIDEND PAYOUTS:",
         "--------------------------------------------------",
         "NEW TARGET BANK NAME: APEX DEVELOPMENT BANK",
-        "NEW ACCOUNT NUMBER: 912010024883109",
+        f"NEW ACCOUNT NUMBER: {account_number}",
         "NEW TARGET IFSC CODE: KFIN0004112",
         "",
         "==================================================",
@@ -47,10 +47,17 @@ def create_ocr_test_image():
         y_position += line_spacing
         
     # 4. Save directly as a clean image file
-    output_filename = "investor_statement_q3.png"
-    image.save(output_filename, "PNG")
-    print("Success! File saved as: " + os.path.abspath(output_filename))
-    print("Ready to test against your live EasyOCR API endpoint.")
+    image.save(filename, "PNG")
+    print("Success! File saved as: " + os.path.abspath(filename))
 
 if __name__ == "__main__":
-    create_ocr_test_image()
+    users = [
+        ("Amit Sharma", "912010024883109", "investor_statement_q3.png"),
+        ("Priya Sharma", "1122334455", "investor_statement_priya.png"),
+        ("John Doe", "1111111111", "investor_statement_john.png"),
+        ("Jane Smith", "9999999999", "investor_statement_jane.png")
+    ]
+    
+    for user in users:
+        create_ocr_test_image(*user)
+    print("Ready to test against your live EasyOCR API endpoint.")

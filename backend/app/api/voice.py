@@ -1,6 +1,6 @@
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from pydantic import BaseModel
-import whisper
+
 import os
 import uuid
 import shutil
@@ -12,18 +12,19 @@ class VoiceTranscriptionResponse(BaseModel):
     message: str
     audio_path: str
 
-print("🤖 Loading Whisper-Tiny (Private Voice AI)...")
+print("[AI] Loading Whisper-Tiny (Private Voice AI)...")
 _whisper_model = None
 
 def get_whisper_model():
     global _whisper_model
     if _whisper_model is None:
+        import whisper
         import torch
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"⚡ Loading Whisper-tiny on {device}...")
+        print(f"[RUN] Loading Whisper-tiny on {device}...")
         # Load the smallest whisper model (~150MB) for ultra-fast, local processing
         _whisper_model = whisper.load_model("tiny", device=device)
-        print("✅ Whisper-tiny loaded successfully.")
+        print("[OK] Whisper-tiny loaded successfully.")
     return _whisper_model
 
 @router.post("/transcribe", response_model=VoiceTranscriptionResponse)

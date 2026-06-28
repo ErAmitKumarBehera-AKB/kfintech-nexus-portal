@@ -6,9 +6,9 @@ import { useAuth } from '../context/AuthContext';
 
 const DEMO_CREDENTIALS = [
     { email: 'investor@kfintech.com', role: 'INVESTOR', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30' },
-    { email: 'l1agent@kfintech.com',  role: 'ADMIN_L1',    color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30' },
-    { email: 'l2agent@kfintech.com',  role: 'ADMIN_L2',    color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/30' },
-    { email: 'admin@kfintech.com',    role: 'ADMIN_SUPER',  color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30' },
+    { email: 'l1agent@kfintech.com', role: 'ADMIN_L1', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30' },
+    { email: 'l2agent@kfintech.com', role: 'ADMIN_L2', color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/30' },
+    { email: 'admin@kfintech.com', role: 'ADMIN_SUPER', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30' },
 ];
 
 const DEMO_PASSWORD = 'KFintech@2026';
@@ -160,11 +160,10 @@ const LoginPage = () => {
                             disabled={isLoading}
                             whileHover={{ scale: isLoading ? 1 : 1.02 }}
                             whileTap={{ scale: isLoading ? 1 : 0.98 }}
-                            className={`w-full flex items-center justify-center gap-2.5 py-4 rounded-xl font-extrabold text-sm uppercase tracking-widest transition-all shadow-lg ${
-                                isLoading
+                            className={`w-full flex items-center justify-center gap-2.5 py-4 rounded-xl font-extrabold text-sm uppercase tracking-widest transition-all shadow-lg ${isLoading
                                     ? 'bg-kfintech-border text-gray-500 cursor-wait'
                                     : 'bg-kfintech-primary text-white hover:bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.6)]'
-                            }`}
+                                }`}
                         >
                             {isLoading ? (
                                 <>

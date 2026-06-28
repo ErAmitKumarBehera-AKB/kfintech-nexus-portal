@@ -73,8 +73,8 @@ const ChatbotWidget = () => {
         setIsLoading(true);
 
         try {
-            const res = await apiClient.post('/summarize/chat', { message: userMsg.text });
-            const botResponse = res.data?.response || "I'm sorry, I couldn't process that.";
+            const res = await apiClient.post('/chat/ask', { question: userMsg.text });
+            const botResponse = res.data?.data?.response || "I'm sorry, I couldn't process that.";
             
             // Add bot message with typing effect enabled
             setMessages(prev => [...prev, { sender: 'bot', text: botResponse, isTyping: true }]);

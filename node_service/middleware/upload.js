@@ -5,10 +5,10 @@ const storage = multer.memoryStorage();
 
 // Strict File filter for JPEG and PNG only
 const fileFilter = (req, file, cb) => {
-    if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png') {
+    if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png' || file.mimetype.startsWith('audio/') || file.mimetype.startsWith('video/')) {
         cb(null, true);
     } else {
-        cb(new Error('Strict FileType Error: Only JPEG and PNG images are allowed.'), false);
+        cb(new Error('Strict FileType Error: Only JPEG, PNG, or Audio files are allowed.'), false);
     }
 };
 

@@ -116,3 +116,7 @@ exports.me = async (req, res) => {
 exports.logout = async (req, res) => {
     return res.status(200).json({ message: 'Logged out successfully.' });
 };
+
+exports.register = async (req, res) => {
+    return res.status(501).json({ message: 'Not implemented' });
+};

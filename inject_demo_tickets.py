@@ -60,6 +60,23 @@ def inject_tickets():
     
     print("Node Service is UP! Injecting Demo Tickets...")
     
+    def get_token(email, password="KFintech@2026"):
+        try:
+            res = requests.post("http://localhost:5000/api/auth/login", json={"email": email, "password": password})
+            if res.status_code == 200:
+                return res.json().get("accessToken")
+        except Exception as e:
+            print(f"Login failed for {email}: {e}")
+        return None
+        
+    investor_token = get_token("investor@kfintech.com")
+    l1_token = get_token("l1agent@kfintech.com")
+    l2_token = get_token("l2agent@kfintech.com")
+    
+    if not investor_token or not l1_token or not l2_token:
+        print("Error: Failed to obtain auth tokens. Make sure database is seeded.")
+        return
+    
     try:
         from PIL import Image, ImageDraw
     except ImportError:
@@ -121,7 +138,8 @@ def inject_tickets():
         }
         
         try:
-            res = requests.post("http://localhost:5000/api/tickets", data=data, files=files)
+            headers = {"Authorization": f"Bearer {investor_token}"}
+            res = requests.post("http://localhost:5000/api/tickets", data=data, files=files, headers=headers)
             if res.status_code == 201:
                 ticket_id = res.json()['ticket']['_id']
                 print(f"Success! Ticket ID: {ticket_id}")
@@ -131,7 +149,7 @@ def inject_tickets():
                 l1_res = requests.post("http://localhost:5000/api/admin/move-to-l2", json={
                     "ticketId": ticket_id,
                     "adminId": "60d5ecb8b392d700153f3a11"
-                })
+                }, headers={"Authorization": f"Bearer {l1_token}"})
                 
                 # --- Step 3: L2 Checker Approve ---
                 print(f"  -> L2 Checker Approving...")
@@ -140,10 +158,15 @@ def inject_tickets():
                     "checkerId": "60d5ecb8b392d700153f3a22",
                     "action": "APPROVE",
                     "comments": "Looks good, approved by automated script."
-                })
+                }, headers={"Authorization": f"Bearer {l2_token}"})
                 
                 if l2_res.status_code == 200:
                     print(f"  ✅ Ticket Fully Approved! AWS LocalStack SMS & Email triggered.")
+                    
+                    # Print L2 Summary specifically
+                    summary = l2_res.json().get('ticket', {}).get('l2_summary')
+                    if summary:
+                        print(f"  📝 AI Summary:\n    {summary}")
                 
             else:
                 print(f"Failed! Status Code: {res.status_code}, Response: {res.text}")

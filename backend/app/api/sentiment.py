@@ -14,13 +14,10 @@ class ComplaintResponse(BaseModel):
     priority: str
     fraud_alert: bool = False
 
-# pyrefly: ignore [missing-import]
-import torch
-# pyrefly: ignore [missing-import]
-from transformers import pipeline
-
 # Load pipeline globally to avoid reloading on every request
 try:
+    import torch
+    from transformers import pipeline
     device = 0 if torch.cuda.is_available() else -1
     # Upgraded to Industry-Standard Financial Model
     sentiment_analyzer = pipeline("sentiment-analysis", model="ProsusAI/finbert", device=device)

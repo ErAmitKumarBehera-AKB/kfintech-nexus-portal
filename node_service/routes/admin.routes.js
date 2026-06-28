@@ -5,8 +5,13 @@ const adminController = require('../controllers/admin.controller');
 const { authenticate, authorize } = require('../middleware/auth');
 
 // Route: POST /api/admin/verify-document
-// L1 Maker desk and Super Admins can verify investor documents
+// L1 Maker desk and Super Admins can verify investor documents (full flow with ticketId)
 router.post('/verify-document', authenticate, authorize('ADMIN_L1', 'ADMIN_SUPER'), upload.single('file'), adminController.verifyInvestorDocument);
+
+// Route: POST /api/admin/ocr-scan
+// Standalone OCR scan — no ticketId required. Used by L1 Vision OCR preview panel.
+router.post('/ocr-scan', authenticate, authorize('ADMIN_L1', 'ADMIN_SUPER'), upload.single('file'), adminController.ocrScan);
+
 
 // Route: PUT /api/admin/escalate/:id
 // L1 Maker desk and Super Admins can escalate tickets to L2

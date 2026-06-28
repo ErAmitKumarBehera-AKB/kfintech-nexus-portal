@@ -87,33 +87,41 @@ const L1MakerDesk = () => {
     };
 
     const handleRunOCR = async () => {
-        if (!ocrFile) {
-            alert('Please attach a document file before running OCR verification.');
-            return;
-        }
         const accountNumber = selectedTicket?.accountNumber || selectedTicket?.serviceMetadata?.newAccountNumber || '000000';
+        const investorName = selectedTicket?.investorName || '';
         setIsOcrRunning(true);
         setOcrResult(null);
         try {
             const formData = new FormData();
             formData.append('account_number', accountNumber);
-            formData.append('file', ocrFile);
-            // Call the real FastAPI OCR endpoint (Florence-2 Vision OCR mock)
-            const res = await apiClient.post('/ocr/verify-account', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-                baseURL: 'http://localhost:8000'
+            formData.append('investor_name', investorName);
+            formData.append('ticketId', selectedTicket._id);
+            
+            // Route through Node proxy → Python OCR backend
+            const res = await apiClient.post('/admin/ocr-scan', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
+            let rawText = Array.isArray(res.data.extracted_text)
+                           ? res.data.extracted_text.join('\n')
+                           : (res.data.extracted_text || 'No text extracted.');
+            
+            rawText = rawText.replace(/(ACCOUNT NO:)/gi, '\n$1')
+                             .replace(/(INVESTOR:)/gi, '\n$1')
+                             .replace(/(DATE :)/gi, '\n$1')
+                             .replace(/(NEXUS AI SECURE PROCESSING BLOCK)/gi, '\n$1');
+
             setOcrResult({
-                matched: res.data.account_found,
-                extracted: res.data.extracted_text?.join('\n') || 'No text extracted.',
+                matched:   res.data.accountVerified,
+                verificationDetails: res.data.verification_details,
+                extracted: rawText,
                 message: res.data.message
             });
         } catch (err) {
             console.error('OCR error:', err);
             setOcrResult({
-                matched: false,
+                matched:   false,
                 extracted: 'OCR request failed. Please check the backend connection.',
-                message: err.response?.data?.detail || err.message
+                message:   err.response?.data?.detail || err.response?.data?.message || err.message
             });
         } finally {
             setIsOcrRunning(false);
@@ -341,38 +349,25 @@ const L1MakerDesk = () => {
                                 </h4>
                                 <div className="flex gap-6">
 
-                                    {/* Left: Document upload drop zone */}
-                                    <div className="w-1/2 bg-kfintech-bg/50 rounded-xl border-2 border-dashed border-kfintech-border hover:border-kfintech-primary/50 flex items-center justify-center p-8 relative overflow-hidden min-h-[300px] shadow-inner group transition-colors">
+                                    {/* Left: Document upload drop zone (Automated) */}
+                                    <div className="w-1/2 bg-kfintech-bg/50 rounded-xl border-2 border-dashed border-kfintech-border flex items-center justify-center p-8 relative overflow-hidden min-h-[300px] shadow-inner group transition-colors">
                                         <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none transform -rotate-45">
                                             <span className="text-4xl font-black tracking-widest text-white">CONFIDENTIAL</span>
                                         </div>
-                                        <label className="text-center relative z-10 cursor-pointer flex flex-col items-center gap-3">
-                                            <input
-                                                type="file"
-                                                accept="image/*,application/pdf"
-                                                className="hidden"
-                                                onChange={(e) => {
-                                                    setOcrFile(e.target.files[0] || null);
-                                                    setOcrResult(null);
-                                                }}
-                                            />
-                                            {ocrFile ? (
+                                        <div className="text-center relative z-10 flex flex-col items-center gap-3">
+                                            {selectedTicket.documentName ? (
                                                 <>
                                                     <FileText className="w-14 h-14 text-kfintech-primary" />
-                                                    <p className="text-sm font-bold text-blue-300 break-all max-w-[160px]">{ocrFile.name}</p>
-                                                    <p className="text-xs text-emerald-400 font-bold">✓ Ready for OCR</p>
+                                                    <p className="text-sm font-bold text-blue-300 break-all max-w-[160px]">{selectedTicket.documentName}</p>
+                                                    <p className="text-xs text-emerald-400 font-bold">✓ Ready for OCR Scanning</p>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Upload className="w-14 h-14 text-gray-500 group-hover:text-kfintech-primary transition-colors" />
-                                                    <p className="text-sm font-bold text-gray-400 group-hover:text-white transition-colors">Click to upload document</p>
-                                                    <p className="text-xs text-gray-600">PNG, JPG, PDF supported</p>
-                                                    {selectedTicket.documentName && (
-                                                        <p className="text-xs text-blue-400 mt-1 font-mono">{selectedTicket.documentName}</p>
-                                                    )}
+                                                    <XCircle className="w-14 h-14 text-gray-500" />
+                                                    <p className="text-sm font-bold text-gray-400">No Document Attached</p>
                                                 </>
                                             )}
-                                        </label>
+                                        </div>
                                     </div>
 
                                     {/* Right: OCR Engine panel */}
@@ -386,24 +381,15 @@ const L1MakerDesk = () => {
                                                 Upload a bank statement or cheque image. The Vision OCR engine will extract all text and fuzzy-match the account number against CRM records.
                                             </p>
 
-                                            {/* Account number being verified */}
-                                            <div className="mb-4 bg-kfintech-bg p-3 rounded-lg border border-kfintech-border">
-                                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Verifying Account No.</p>
-                                                <p className="text-sm font-mono font-bold text-white">
-                                                    {selectedTicket.accountNumber ||
-                                                     selectedTicket.serviceMetadata?.newAccountNumber ||
-                                                     selectedTicket.serviceMetadata?.accountNumber ||
-                                                     <span className="text-gray-500">Not provided in ticket</span>}
-                                                </p>
-                                            </div>
+
 
                                             <motion.button
                                                 whileHover={{ scale: 1.02 }}
                                                 whileTap={{ scale: 0.98 }}
                                                 onClick={handleRunOCR}
-                                                disabled={isOcrRunning}
+                                                disabled={isOcrRunning || !selectedTicket.documentName}
                                                 className={`w-full py-4 rounded-xl text-sm font-bold uppercase tracking-wider text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
-                                                    isOcrRunning ? 'bg-kfintech-border cursor-wait text-gray-400' : 'bg-kfintech-primary hover:bg-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.6)]'
+                                                    (isOcrRunning || !selectedTicket.documentName) ? 'bg-kfintech-border cursor-not-allowed text-gray-400' : 'bg-kfintech-primary hover:bg-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.6)]'
                                                 }`}
                                             >
                                                 {isOcrRunning ? (
@@ -433,6 +419,18 @@ const L1MakerDesk = () => {
                                                         </div>
                                                         {ocrResult.message && (
                                                             <p className="text-xs text-gray-400 mb-2 italic">{ocrResult.message}</p>
+                                                        )}
+                                                        {ocrResult.verificationDetails && Object.keys(ocrResult.verificationDetails).length > 0 && (
+                                                            <div className="mb-3 space-y-1">
+                                                                {Object.entries(ocrResult.verificationDetails).map(([key, value]) => (
+                                                                    <div key={key} className="flex items-center justify-between text-xs bg-black/20 p-2 rounded">
+                                                                        <span className="text-gray-400 font-medium">{key}</span>
+                                                                        <span className={value === true ? 'text-emerald-400 font-bold' : value === false ? 'text-red-400 font-bold' : 'text-blue-400 font-bold'}>
+                                                                            {typeof value === 'boolean' ? (value ? 'Verified' : 'Not Found') : value}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         )}
                                                         <pre className="text-xs bg-kfintech-bg/80 p-3 rounded-lg text-gray-300 font-mono border border-kfintech-border shadow-inner leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">
                                                             {ocrResult.extracted}

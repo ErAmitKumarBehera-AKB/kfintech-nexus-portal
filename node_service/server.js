@@ -61,6 +61,7 @@ const adminRoutes = require('./routes/admin.routes');
 const l2Routes = require('./routes/l2.routes');
 const chatRoutes = require('./routes/chat.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const voiceRoutes = require('./routes/voice.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
@@ -68,6 +69,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/l2', l2Routes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/voice', voiceRoutes);
 
 // Simple Health Check Endpoint
 app.get('/health', (req, res) => {

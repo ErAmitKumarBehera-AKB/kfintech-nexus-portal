@@ -53,6 +53,22 @@ const DEMO_USERS = [
         phoneNumber: '+911234567893',
         role: 'ADMIN_SUPER',
         isActive: true
+    },
+    {
+        _id: new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a04'),
+        name: 'John Doe',
+        email: 'john@kfintech.com',
+        phoneNumber: '+911111111111',
+        role: 'INVESTOR',
+        isActive: true
+    },
+    {
+        _id: new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a05'),
+        name: 'Jane Smith',
+        email: 'jane@kfintech.com',
+        phoneNumber: '+919999999999',
+        role: 'INVESTOR',
+        isActive: true
     }
 ];
 

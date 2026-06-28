@@ -84,7 +84,7 @@ const AppRoutes = () => {
                     />
                 </Routes>
             </main>
-            
+
             {/* AI Assistant Chatbot (Only for Investors) */}
             {isAuthenticated && user?.role === 'INVESTOR' && <ChatbotWidget />}
         </div>
