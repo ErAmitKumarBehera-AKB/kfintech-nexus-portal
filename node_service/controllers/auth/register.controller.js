@@ -3,6 +3,8 @@ const passwordService = require('../../services/auth/password.service');
 const tokenService = require('../../services/auth/token.service');
 const cookieService = require('../../services/auth/cookie.service');
 const User = require('../../models/User'); // Keep for creation until authService is built, or just use User directly here
+const snsService = require('../../services/snsService');
+const sesService = require('../../services/sesService');
 
 exports.register = async (req, res) => {
     try {
@@ -22,6 +24,29 @@ exports.register = async (req, res) => {
             phoneNumber: phoneNumber?.trim(),
             role: 'INVESTOR'
         });
+
+        // Send Welcome Email
+        try {
+            await sesService.sendEmail({
+                to: newUser.email,
+                subject: 'Welcome to FinnovaX Portal!',
+                message: `<h2>Welcome, ${newUser.name}!</h2><p>Thank you for registering with FinnovaX. You can now securely log in and track your investments and tickets.</p>`
+            });
+        } catch (err) {
+            console.error('Failed to send welcome email:', err);
+        }
+
+        // Send Welcome SMS if phone number exists
+        if (newUser.phoneNumber) {
+            try {
+                await snsService.sendSMS({
+                    phoneNumber: newUser.phoneNumber,
+                    message: `Welcome to FinnovaX, ${newUser.name}! Your account has been successfully created.`
+                });
+            } catch (err) {
+                console.error('Failed to send welcome SMS:', err);
+            }
+        }
 
         const accessToken = tokenService.generateAccessToken(newUser);
         const refreshToken = await tokenService.generateRefreshToken(newUser._id);

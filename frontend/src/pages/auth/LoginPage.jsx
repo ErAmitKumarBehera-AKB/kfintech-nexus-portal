@@ -17,7 +17,7 @@ const DEMO_CREDENTIALS = [
 const DEMO_PASSWORD = 'KFintech@2026';
 
 const LoginPage = () => {
-    const { login, verifyOtp, getRoleDefaultRoute } = useAuth();
+    const { login, verifyOtp, getRoleDefaultRoute, updateSession } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -57,6 +57,11 @@ const LoginPage = () => {
             if (data.requiresOtp) {
                 setIsOtpStep(true);
                 setSuccessMessage(data.message || 'OTP sent successfully.');
+            } else if (data.user) {
+                // OTP bypassed, user returned directly
+                updateSession(data.user);
+                const destination = from || getRoleDefaultRoute(data.user.role);
+                navigate(destination, { replace: true });
             }
         } catch (err) {
             const msg = err.response?.data?.message || 'Login failed. Please check your credentials.';

@@ -2,6 +2,7 @@ const { uploadToS3 } = require('../s3Service');
 const { v4: uuidv4 } = require('uuid');
 const axios = require('axios');
 const FormData = require('form-data');
+const cloudinary = require('cloudinary').v2;
 
 exports.uploadDocuments = async (files) => {
     const uploadedDocuments = [];
@@ -15,27 +16,42 @@ exports.uploadDocuments = async (files) => {
             throw new Error("Invalid file type. Only PDF and images (PNG/JPG) are allowed.");
         }
 
-        // S3 Document Upload
+        // Document Upload (Cloudinary or S3)
         const fileName = `${uuidv4()}-${file.originalname}`;
         let documentUrl = null;
+        
         try {
-            await uploadToS3({
-                Key: fileName,
-                Body: file.buffer,
-                ContentType: file.mimetype,
-            });
-            
-            const bucket = process.env.AWS_BUCKET_NAME || "kfintech-bucket";
-            if (process.env.AWS_ENDPOINT_URL) {
-                // LocalStack - browser accessible URL
-                const publicEndpoint =process.env.PUBLIC_S3_URL || "http://localhost:4566";
-                documentUrl = `${publicEndpoint}/${bucket}/${encodeURIComponent(fileName)}`;}
-                 else {
+            if (process.env.CLOUDINARY_URL) {
+                // Production Deployment: Cloudinary
+                const uploadResult = await new Promise((resolve, reject) => {
+                    cloudinary.uploader.upload_stream(
+                        { resource_type: 'auto', public_id: fileName, folder: 'kfintech-nexus' },
+                        (error, result) => {
+                            if (error) reject(error);
+                            else resolve(result);
+                        }
+                    ).end(file.buffer);
+                });
+                documentUrl = uploadResult.secure_url;
+            } else {
+                // Local Development: AWS LocalStack S3
+                await uploadToS3({
+                    Key: fileName,
+                    Body: file.buffer,
+                    ContentType: file.mimetype,
+                });
+                
+                const bucket = process.env.AWS_BUCKET_NAME || "kfintech-bucket";
+                if (process.env.AWS_ENDPOINT_URL) {
+                    const publicEndpoint = process.env.PUBLIC_S3_URL || "http://localhost:4566";
+                    documentUrl = `${publicEndpoint}/${bucket}/${encodeURIComponent(fileName)}`;
+                } else {
                     const region = process.env.AWS_REGION || "ap-south-1";
                     documentUrl = `https://${bucket}.s3.${region}.amazonaws.com/${encodeURIComponent(fileName)}`;
                 }
+            }
         } catch (error) {
-            console.error("LocalStack S3 Upload Error:", error.message);
+            console.error("Storage Upload Error:", error.message);
             throw new Error("Failed to upload document to secure storage.");
         }
 

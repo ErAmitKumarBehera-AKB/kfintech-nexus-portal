@@ -21,6 +21,17 @@ exports.initiateLogin = async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
+        if (user.role !== 'INVESTOR') {
+            const accessToken = tokenService.generateAccessToken(user);
+            const refreshToken = await tokenService.generateRefreshToken(user._id);
+            cookieService.setAuthCookies(res, accessToken, refreshToken);
+            return res.status(200).json({ 
+                message: 'Login successful.', 
+                requiresOtp: false, 
+                user: userService.getPublicProfile(user) 
+            });
+        }
+
         await otpService.generateAndSendOTP(user);
         return res.status(200).json({ message: 'OTP sent.', requiresOtp: true, email: user.email });
     } catch (error) {
