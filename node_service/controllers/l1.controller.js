@@ -3,16 +3,18 @@ const Ticket = require('../models/Ticket');
 const AuditLog = require('../models/AuditLog');
 const { getServiceConfig } = require('../utils/serviceTypes');
 const notificationService = require('../services/notificationService');
+const mlService = require('../services/mlService');
+const { escapeRegex } = require('../utils/escapeRegex');
 const axios = require('axios');
 
 exports.getL1Queue = async (req, res) => {
     try {
         const { status, assigned, age, priority, search, page = 1, limit = 20 } = req.query;
-        
+
         // Base query: L1 deals with OPEN and L1_REVIEW tickets typically
         // but we'll let the frontend request what it wants. Default to OPEN and IN_PROGRESS if not specified.
         const query = {};
-        
+
         if (status && status !== 'ALL') {
             query.status = status;
         } else {
@@ -30,12 +32,13 @@ exports.getL1Queue = async (req, res) => {
         }
 
         if (search) {
+            const safeSearch = escapeRegex(search);
             query.$or = [
-                { title: { $regex: search, $options: 'i' } },
-                { investorName: { $regex: search, $options: 'i' } }
+                { title: { $regex: safeSearch, $options: 'i' } },
+                { investorName: { $regex: safeSearch, $options: 'i' } }
             ];
-            
-            // If it looks like an object ID, also search by ID
+
+            // If it looks like an object ID, also search by exact _id
             if (mongoose.Types.ObjectId.isValid(search)) {
                 query.$or.push({ _id: search });
             }
@@ -55,11 +58,6 @@ exports.getL1Queue = async (req, res) => {
             .populate('assignedL1', 'name email');
 
         const total = await Ticket.countDocuments(query);
-        
-        console.log("L1 Queue Query:", JSON.stringify(query));
-        const allTix = await Ticket.find({}).select('status assignedL1 title');
-        console.log("All DB Tickets:", allTix);
-        console.log("Filtered tickets length:", tickets.length);
 
         res.status(200).json({
             tickets,
@@ -79,7 +77,7 @@ exports.assignTicket = async (req, res) => {
     try {
         const ticketId = req.params.id;
         const ticket = await Ticket.findById(ticketId);
-        
+
         if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
         const session = await mongoose.startSession();
@@ -90,7 +88,7 @@ exports.assignTicket = async (req, res) => {
             if (ticket.status === 'OPEN') {
                 ticket.status = 'IN_PROGRESS';
             }
-            
+
             await ticket.save({ session });
 
             const auditLog = new AuditLog({
@@ -119,84 +117,28 @@ exports.assignTicket = async (req, res) => {
     }
 };
 
-exports.verifyDocument = async (req, res) => {
-    try {
-        const { id, docId } = req.params;
-        const { verified } = req.body; // boolean
 
-        const ticket = await Ticket.findById(id);
-        if (!ticket) return res.status(404).json({ message: "Ticket not found" });
-
-        const docIndex = ticket.documents.findIndex(d => d._id.toString() === docId);
-        if (docIndex === -1) return res.status(404).json({ message: "Document not found on this ticket" });
-
-        const session = await mongoose.startSession();
-        session.startTransaction();
-
-        try {
-            if (!ticket.assignedL1) ticket.assignedL1 = req.user.id;
-            if (ticket.status === 'OPEN') ticket.status = 'IN_PROGRESS';
-            
-            const beforeStatus = ticket.documents[docIndex].status;
-            ticket.documents[docIndex].status = verified ? 'VERIFIED' : 'PENDING';
-            
-            await ticket.save({ session });
-
-            const auditLog = new AuditLog({
-                entityId: ticket._id,
-                entityType: 'Ticket',
-                action: 'VERIFY_DOCUMENT',
-                performedBy: req.user.id,
-                details: {
-                    documentId: docId,
-                    before: { status: beforeStatus },
-                    after: { status: ticket.documents[docIndex].status }
-                }
-            });
-            await auditLog.save({ session });
-
-            await session.commitTransaction();
-            session.endSession();
-
-            return res.status(200).json({ message: "Document verification status updated", documents: ticket.documents });
-        } catch (err) {
-            await session.abortTransaction();
-            session.endSession();
-            throw err;
-        }
-    } catch (error) {
-        console.error("Verify doc error:", error);
-        res.status(500).json({ message: "Internal server error" });
-    }
-};
 
 exports.escalateTicket = async (req, res) => {
     try {
         const ticketId = req.params.id;
         const { notes } = req.body;
-        
+
         const ticket = await Ticket.findById(ticketId);
         if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
-        // Ensure all required docs are verified
-        const serviceConfig = getServiceConfig(ticket.serviceType);
-        if (serviceConfig.requiredDocuments.length > 0) {
-            const allVerified = ticket.documents.every(doc => doc.status === 'VERIFIED');
-            if (!allVerified && ticket.documents.length > 0) {
-                return res.status(400).json({ message: "All attached documents must be verified before escalation." });
-            }
-        }
+
 
         const session = await mongoose.startSession();
         session.startTransaction();
 
         try {
             if (!ticket.assignedL1) ticket.assignedL1 = req.user.id;
-            
+
             const beforeStatus = ticket.status;
             ticket.status = 'L2_APPROVAL';
             ticket.l1Notes = notes || ticket.l1Notes;
-            
+
             await ticket.save({ session });
 
             const auditLog = new AuditLog({
@@ -251,7 +193,7 @@ exports.rejectTicket = async (req, res) => {
 
         try {
             if (!ticket.assignedL1) ticket.assignedL1 = req.user.id;
-            
+
             const beforeStatus = ticket.status;
             ticket.status = 'REJECTED';
             ticket.revisionReason = reason;
@@ -259,7 +201,7 @@ exports.rejectTicket = async (req, res) => {
             ticket.documents.forEach(doc => {
                 if (doc.status !== 'VERIFIED') doc.status = 'REJECTED';
             });
-            
+
             await ticket.save({ session });
 
             const auditLog = new AuditLog({
@@ -306,18 +248,15 @@ exports.summarizeTicket = async (req, res) => {
         const ticket = await Ticket.findById(ticketId);
         if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
-        // Call Python AI Engine
-        const aiResponse = await axios.post('http://127.0.0.1:8000/summarize/ticket', {
-            ticket_data: {
-                title: ticket.title,
-                description: ticket.description,
-                serviceType: ticket.serviceType,
-                metadata: ticket.serviceMetadata
-            }
+        // Delegate to centralised ML service — respects ML_SERVICE_URL env var
+        const aiData = await mlService.summarizeTicket({
+            title: ticket.title,
+            description: ticket.description,
+            serviceType: ticket.serviceType,
+            metadata: ticket.serviceMetadata
         });
 
-        const summaryBullets = aiResponse.data.summary;
-        
+        const summaryBullets = aiData.summary;
         ticket.aiSummary = summaryBullets;
         await ticket.save();
 

@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
-const axios = require('axios');
+const axios = require('axios'); // Still used for S3 file download in runOcr
 const ticketService = require('../services/ticket/ticket.service');
 const documentService = require('../services/ticket/document.service');
 const workflowService = require('../services/ticket/workflow.service');
 const auditService = require('../services/ticket/audit.service');
 const notificationService = require('../services/notificationService');
 const { getServiceConfig, buildSlaTimeline } = require('../utils/serviceTypes');
+const mlService = require('../services/mlService');
 
 exports.createTicket = async (req, res) => {
     const { title, description, complaintText, investorName = "Jane Doe", accountNumber = "123456789", serviceType = 'COMPLAINT' } = req.body;
@@ -45,18 +46,14 @@ exports.createTicket = async (req, res) => {
     session.startTransaction();
 
     try {
-        const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
         let aiPayload = { priority: 'NORMAL', score: 0.5, fraud_alert: false };
         let aiSummary = [];
-        
+
         if (serviceType === 'COMPLAINT') {
             try {
-                const sentimentRes = await axios.post(`${mlServiceUrl}/sentiment/analyze`, {
-                    text: title + " " + finalDescription
-                });
-                aiPayload = sentimentRes.data;
+                aiPayload = await mlService.analyzeSentiment(title + ' ' + finalDescription);
             } catch (err) {
-                console.error("Sentiment API failed:", err.message);
+                console.error('Sentiment API failed:', err.message);
             }
         }
 
@@ -290,40 +287,39 @@ exports.runOcr = async (req, res) => {
             return res.status(400).json({ message: "OCR can only be run on images." });
         }
 
-        const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
-
-        // 1. Fetch file from S3
+        // 1. Fetch file from S3 (stored as a URL in document.s3Key)
         let fileBuffer;
         try {
-            const s3Response = await axios.get(document.s3Key, { responseType: 'arraybuffer' });
+            let downloadUrl = document.s3Key;
+            // If running inside Docker, rewrite localhost to localstack (or whatever internal endpoint is set)
+            if (process.env.AWS_ENDPOINT_URL && downloadUrl.includes('localhost')) {
+                const internalHost = new URL(process.env.AWS_ENDPOINT_URL).hostname;
+                downloadUrl = downloadUrl.replace('localhost', internalHost);
+            }
+            
+            const s3Response = await axios.get(downloadUrl, { responseType: 'arraybuffer' });
             fileBuffer = Buffer.from(s3Response.data);
         } catch (error) {
-            console.error("Error downloading file from S3 for OCR:", error.message);
-            return res.status(500).json({ message: "Failed to fetch document from storage." });
+            console.error('Error downloading file from S3 for OCR:', error.message);
+            return res.status(500).json({ message: 'Failed to fetch document from storage.' });
         }
 
-        // 2. Run OCR Verification
+        // 2. Run OCR Verification via centralised ML service
         let ocrExtractedText = null;
         let ocrMatchVerified = false;
 
         try {
-            const FormData = require('form-data');
-            const formData = new FormData();
-            formData.append('account_number', ticket.accountNumber || "");
-            formData.append('files', fileBuffer, {
-                filename: document.name,
-                contentType: document.fileType,
-            });
-            
-            const ocrRes = await axios.post(`${mlServiceUrl}/ocr/verify-account`, formData, {
-                headers: { ...formData.getHeaders() }
-            });
-            
-            ocrExtractedText = ocrRes.data.extracted_text.join('\n');
-            ocrMatchVerified = ocrRes.data.account_found;
+            const ocrData = await mlService.verifyAccount(
+                fileBuffer,
+                document.name,
+                document.fileType,
+                ticket.accountNumber || ''
+            );
+            ocrExtractedText = ocrData.extracted_text.join('\n');
+            ocrMatchVerified = ocrData.account_found;
         } catch (error) {
-            console.error("EasyOCR Error:", error.message);
-            ocrExtractedText = "OCR Processing Failed: " + error.message;
+            console.error('EasyOCR Error:', error.message);
+            ocrExtractedText = 'OCR Processing Failed: ' + error.message;
         }
 
         // 3. Update the database
