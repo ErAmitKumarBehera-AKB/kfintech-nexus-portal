@@ -23,7 +23,7 @@ async function testLocalStack() {
             forcePathStyle: true
         });
 
-        const bucketName = process.env.AWS_BUCKET_NAME || 'kfintech-bucket';
+        const bucketName = process.env.AWS_BUCKET_NAME || 'finnovaX-bucket';
         try {
             await s3Client.send(new CreateBucketCommand({ Bucket: bucketName }));
             console.log(`✅ S3 Bucket '${bucketName}' created (or already exists).`);
@@ -61,8 +61,8 @@ async function testLocalStack() {
         });
         await sesClient.send(new VerifyEmailIdentityCommand({ EmailAddress: 'test@example.com' }));
         const emailResponse = await sendEmail({
-            to: "investor@kfintech.com",
-            subject: "Welcome to KFintech",
+            to: process.env.SMTP_USER ||"investor@kfintech.com",
+            subject: "Welcome to FinnovaX",
             message: "<h1>Welcome!</h1><p>Your account is ready.</p>"
         });
         console.log("✅ Email sent successfully! MessageId:", emailResponse.MessageId);
