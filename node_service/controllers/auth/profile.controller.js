@@ -1,7 +1,21 @@
 const userService = require('../../services/auth/user.service');
 const documentService = require('../../services/ticket/document.service');
-const axios = require('axios');
-const FormData = require('form-data');
+const mlService = require('../../services/mlService');
+
+/**
+ * Computes whether a user's profile is considered complete.
+ * Extracted from the 3 controller functions that previously duplicated this logic verbatim.
+ */
+const isProfileComplete = (phone, dob, address, bankAccount) => Boolean(
+    phone &&
+    dob &&
+    address?.street &&
+    address?.city &&
+    address?.state &&
+    bankAccount?.bankName &&
+    bankAccount?.accountNumber &&
+    bankAccount?.ifsc
+);
 
 exports.updateProfile = async (req, res) => {
     try {
@@ -18,7 +32,7 @@ exports.updateProfile = async (req, res) => {
         if (files.length > 0) {
             updateData.kyc = currentUser.toObject().kyc || {};
             const uploadedDocs = await documentService.uploadDocuments(files);
-            
+
             for (let doc of uploadedDocs) {
                 const originalFile = files.find(f => f.originalname === doc.name);
                 if (originalFile && originalFile.fieldname === 'aadhaarDoc') {
@@ -28,66 +42,47 @@ exports.updateProfile = async (req, res) => {
                 }
             }
 
-            // OCR VERIFICATION
+            // KYC OCR verification via centralised ML service
             try {
-                const formData = new FormData();
-                formData.append('target_name', updateData.name || currentUser.name || '');
-                formData.append('target_dob', updateData.dob || currentUser.dob || '');
-                files.forEach(f => {
-                    formData.append('files', f.buffer, {
-                        filename: f.originalname,
-                        contentType: f.mimetype
-                    });
-                });
-                const pythonUrl = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
-                const ocrRes = await axios.post(`${pythonUrl}/ocr/verify-kyc`, formData, {
-                    headers: formData.getHeaders()
-                });
-                ocrResult = ocrRes.data;
+                ocrResult = await mlService.verifyKyc(
+                    files,
+                    updateData.name || currentUser.name || '',
+                    updateData.dob || currentUser.dob || ''
+                );
             } catch (e) {
-                console.error("OCR Verification Failed:", e.message);
-                ocrResult = { match_found: false, message: "OCR Engine Offline or Failed." };
+                console.error('OCR Verification Failed:', e.message);
+                ocrResult = { match_found: false, message: 'OCR Engine Offline or Failed.' };
             }
         }
 
-        const checkKyc = updateData.kyc || currentUser.kyc;
-        const checkPhone = updateData.phoneNumber || currentUser.phoneNumber;
-        const checkDob = updateData.dob || currentUser.dob;
-        
+        const checkPhone   = updateData.phoneNumber  || currentUser.phoneNumber;
+        const checkDob     = updateData.dob          || currentUser.dob;
+
         if (updateData.address && typeof updateData.address === 'string') {
             try { updateData.address = JSON.parse(updateData.address); } catch (e) {}
         }
         if (updateData.bankAccount && typeof updateData.bankAccount === 'string') {
             try { updateData.bankAccount = JSON.parse(updateData.bankAccount); } catch (e) {}
         }
-        
-        const checkAddress = updateData.address || currentUser.address;
-        const checkBank = updateData.bankAccount || currentUser.bankAccount;
 
-        const isComplete = Boolean(
-            checkPhone && 
-            checkDob &&
-            checkAddress?.street && 
-            checkAddress?.city && 
-            checkAddress?.state &&
-            checkBank?.bankName &&
-            checkBank?.accountNumber &&
-            checkBank?.ifsc
-        );
+        const checkAddress = updateData.address     || currentUser.address;
+        const checkBank    = updateData.bankAccount  || currentUser.bankAccount;
 
-        updateData.profileCompleted = isComplete;
+        const complete = isProfileComplete(checkPhone, checkDob, checkAddress, checkBank);
+        updateData.profileCompleted = complete;
+
         const user = await userService.updateUserProfile(req.user.userId, updateData);
 
         let missingFields = [];
-        if (!isComplete) {
+        if (!complete) {
             if (!checkPhone) missingFields.push('Phone Number');
-            if (!checkDob) missingFields.push('Date of Birth');
+            if (!checkDob)   missingFields.push('Date of Birth');
             if (!checkAddress?.street || !checkAddress?.city || !checkAddress?.state) missingFields.push('Full Address');
             if (!checkBank?.bankName || !checkBank?.accountNumber || !checkBank?.ifsc) missingFields.push('Bank Details');
         }
 
-        return res.status(200).json({ 
-            message: isComplete ? 'Profile completed successfully!' : `Profile updated, missing: ${missingFields.join(', ')}`, 
+        return res.status(200).json({
+            message: complete ? 'Profile completed successfully!' : `Profile updated, missing: ${missingFields.join(', ')}`,
             user: userService.getPublicProfile(user),
             ocrResult
         });
@@ -111,53 +106,41 @@ exports.uploadDocument = async (req, res) => {
 
         const updateData = { kyc: currentUser.toObject().kyc || {} };
         const uploadedDocs = await documentService.uploadDocuments(files);
-        
+
         const fileField = files[0].fieldname;
         let docTypeKey = '';
-        if (fileField === 'aadhaarDoc') docTypeKey = 'aadhaar';
-        else if (fileField === 'panDoc') docTypeKey = 'pan';
-        else if (fileField === 'dlDoc') docTypeKey = 'dl';
-        
+        if (fileField === 'aadhaarDoc')      docTypeKey = 'aadhaar';
+        else if (fileField === 'panDoc')     docTypeKey = 'pan';
+        else if (fileField === 'dlDoc')      docTypeKey = 'dl';
+
         if (docTypeKey && uploadedDocs.length > 0) {
             updateData.kyc[docTypeKey] = uploadedDocs[0].s3Key;
         }
 
+        // KYC OCR verification via centralised ML service
         let ocrResult = null;
         try {
-            const formData = new FormData();
-            formData.append('target_name', currentUser.name || '');
-            formData.append('target_dob', currentUser.dob || '');
-            formData.append('files', files[0].buffer, {
-                filename: files[0].originalname,
-                contentType: files[0].mimetype
-            });
-            const pythonUrl = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
-            const ocrRes = await axios.post(`${pythonUrl}/ocr/verify-kyc`, formData, {
-                headers: formData.getHeaders()
-            });
-            ocrResult = ocrRes.data;
+            ocrResult = await mlService.verifyKyc(
+                [files[0]],
+                currentUser.name || '',
+                currentUser.dob || ''
+            );
         } catch (e) {
-            console.error("OCR Verification Failed:", e.message);
-            ocrResult = { match_found: false, message: "OCR Engine Offline or Failed." };
+            console.error('OCR Verification Failed:', e.message);
+            ocrResult = { match_found: false, message: 'OCR Engine Offline or Failed.' };
         }
 
-        const checkKyc = updateData.kyc;
-        const isComplete = Boolean(
-            currentUser.phoneNumber && 
-            currentUser.dob &&
-            currentUser.address?.street && 
-            currentUser.address?.city && 
-            currentUser.address?.state &&
-            currentUser.bankAccount?.bankName &&
-            currentUser.bankAccount?.accountNumber &&
-            currentUser.bankAccount?.ifsc
+        const complete = isProfileComplete(
+            currentUser.phoneNumber,
+            currentUser.dob,
+            currentUser.address,
+            currentUser.bankAccount
         );
-
-        updateData.profileCompleted = isComplete;
+        updateData.profileCompleted = complete;
         const user = await userService.updateUserProfile(req.user.userId, updateData);
 
-        return res.status(200).json({ 
-            message: 'Document uploaded successfully.', 
+        return res.status(200).json({
+            message: 'Document uploaded successfully.',
             user: userService.getPublicProfile(user),
             ocrResult
         });
@@ -180,25 +163,19 @@ exports.deleteDocument = async (req, res) => {
         }
 
         const updateData = { kyc: currentUser.toObject().kyc || {} };
-        updateData.kyc[docType] = ''; // clear it
+        updateData.kyc[docType] = '';
 
-        const checkKyc = updateData.kyc;
-        const isComplete = Boolean(
-            currentUser.phoneNumber && 
-            currentUser.dob &&
-            currentUser.address?.street && 
-            currentUser.address?.city && 
-            currentUser.address?.state &&
-            currentUser.bankAccount?.bankName &&
-            currentUser.bankAccount?.accountNumber &&
-            currentUser.bankAccount?.ifsc
+        const complete = isProfileComplete(
+            currentUser.phoneNumber,
+            currentUser.dob,
+            currentUser.address,
+            currentUser.bankAccount
         );
-
-        updateData.profileCompleted = isComplete;
+        updateData.profileCompleted = complete;
         const user = await userService.updateUserProfile(req.user.userId, updateData);
 
-        return res.status(200).json({ 
-            message: 'Document removed successfully.', 
+        return res.status(200).json({
+            message: 'Document removed successfully.',
             user: userService.getPublicProfile(user)
         });
     } catch (error) {

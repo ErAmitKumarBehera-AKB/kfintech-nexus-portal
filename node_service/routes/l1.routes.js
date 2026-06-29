@@ -11,9 +11,6 @@ router.get('/tickets', authenticate, authorize('ADMIN_L1', 'ADMIN_SUPER'), l1Con
 // Assign ticket to current L1
 router.post('/tickets/:id/assign', authenticate, authorize('ADMIN_L1', 'ADMIN_SUPER'), l1Controller.assignTicket);
 
-// Route: POST /api/l1/tickets/:id/verify-document/:docId
-// Verify a document
-router.post('/tickets/:id/verify-document/:docId', authenticate, authorize('ADMIN_L1', 'ADMIN_SUPER'), l1Controller.verifyDocument);
 
 // Route: POST /api/l1/tickets/:id/escalate
 // Escalate to L2

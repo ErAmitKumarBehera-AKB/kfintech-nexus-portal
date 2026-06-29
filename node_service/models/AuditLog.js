@@ -25,4 +25,14 @@ const AuditLogSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+// --- Indexes ---
+// Ticket timeline view: all audit events for a given entity, oldest first
+AuditLogSchema.index({ entityId: 1, createdAt: 1 });
+
+// Agent activity report: actions performed by a given admin, newest first
+AuditLogSchema.index({ performedBy: 1, createdAt: -1 });
+
+// Admin 30-day agent performance aggregation
+AuditLogSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('AuditLog', AuditLogSchema);

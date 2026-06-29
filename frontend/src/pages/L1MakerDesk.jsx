@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import apiClient from '../api/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { Clock, ShieldAlert, Cpu, CheckCircle2, ChevronRight, ChevronLeft, FileText, XCircle, AlertTriangle, Sparkles, Filter, Search, BarChart2 } from 'lucide-react';
+import { Clock, ShieldAlert, Cpu, ChevronRight, ChevronLeft, FileText, XCircle, AlertTriangle, Sparkles, Filter, Search, BarChart2 } from 'lucide-react';
 import { getServiceType } from '../config/serviceTypes';
 import { format } from 'date-fns';
 
@@ -113,15 +113,7 @@ const L1MakerDesk = () => {
         return <span className="text-zinc-600">{hours}h {mins}m remaining</span>;
     };
 
-    const handleVerifyDoc = async (docId, currentStatus) => {
-        try {
-            const newStatus = currentStatus === 'VERIFIED' ? false : true;
-            const res = await apiClient.post(`/l1/tickets/${selectedTicket._id}/verify-document/${docId}`, { verified: newStatus });
-            setSelectedTicket(prev => ({ ...prev, documents: res.data.documents }));
-        } catch (error) {
-            alert(`Verification failed: ${error.response?.data?.message || error.message}`);
-        }
-    };
+
 
     const handleRunOcr = async (docId) => {
         try {
@@ -523,18 +515,10 @@ const L1MakerDesk = () => {
                                         <div className="grid grid-cols-1 gap-4">
                                             {selectedTicket.documents.map((doc, idx) => (
                                                 <Card key={doc._id || idx} className="overflow-hidden">
-                                                    <div className="bg-zinc-50 border-b border-zinc-100 px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+                                                    <div className="bg-zinc-50 border-b border-zinc-100 px-4 py-3 flex items-center flex-wrap gap-2">
                                                         <span className="text-sm font-medium text-zinc-900 flex items-center gap-2">
                                                             <Cpu className="h-4 w-4 text-zinc-400 shrink-0" /> <span className="truncate max-w-[150px] sm:max-w-full">Document {idx + 1}: {doc.name}</span>
                                                         </span>
-                                                        <Button 
-                                                            variant={doc.status === 'VERIFIED' ? "default" : "outline"}
-                                                            size="sm"
-                                                            onClick={() => handleVerifyDoc(doc._id, doc.status)}
-                                                            className={doc.status === 'VERIFIED' ? "bg-emerald-600 hover:bg-emerald-700 text-white h-7 text-xs" : "h-7 text-xs bg-white"}
-                                                        >
-                                                            {doc.status === 'VERIFIED' ? <><CheckCircle2 className="h-3 w-3 mr-1"/> Verified</> : 'Mark as Verified'}
-                                                        </Button>
                                                     </div>
                                                     
                                                     <CardContent className="p-0">
@@ -562,18 +546,13 @@ const L1MakerDesk = () => {
                                                                     <Cpu className="h-4 w-4 text-zinc-500" /> AI Extraction Result
                                                                 </h5>
                                                                 
-                                                                {doc.ocrExtraction ? (
-                                                                    <div className="space-y-3">
-                                                                        <Badge variant="outline" className={doc.ocrExtraction.matchVerified ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}>
-                                                                            {doc.ocrExtraction.matchVerified ? <><CheckCircle2 className="w-3 h-3 mr-1" /> CRM Match Verified</> : <><ShieldAlert className="w-3 h-3 mr-1" /> Verification Failed</>}
-                                                                        </Badge>
-                                                                        <div className="bg-white border border-zinc-200 rounded-md p-3 text-xs font-mono text-zinc-600 max-h-[150px] overflow-y-auto whitespace-pre-wrap">
-                                                                            {doc.ocrExtraction.extractedText || "No text extracted."}
-                                                                        </div>
+                                                                {doc.ocrExtraction?.extractedText ? (
+                                                                    <div className="bg-white border border-zinc-200 rounded-md p-3 text-xs font-mono text-zinc-600 max-h-[150px] overflow-y-auto whitespace-pre-wrap">
+                                                                        {doc.ocrExtraction.extractedText}
                                                                     </div>
                                                                 ) : (
                                                                     <div className="flex flex-col items-center justify-center h-[150px] border border-dashed border-zinc-300 rounded-md bg-white">
-                                                                        <p className="text-sm text-zinc-500 mb-3">OCR extraction pending.</p>
+                                                                        <p className="text-sm text-zinc-500 mb-3">No OCR data available.</p>
                                                                         <Button 
                                                                             variant="outline"
                                                                             size="sm"
@@ -582,7 +561,7 @@ const L1MakerDesk = () => {
                                                                             {runningOcr === doc._id ? (
                                                                                 <><div className="h-3 w-3 mr-2 animate-spin rounded-full border-2 border-zinc-400 border-t-zinc-900" /> Processing...</>
                                                                             ) : (
-                                                                                <><Cpu className="h-3 w-3 mr-2" /> Run OCR Verification</>
+                                                                                <><Cpu className="h-3 w-3 mr-2" /> Run OCR</>
                                                                             )}
                                                                         </Button>
                                                                     </div>

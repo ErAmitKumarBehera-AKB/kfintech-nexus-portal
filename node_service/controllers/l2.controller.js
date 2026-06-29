@@ -5,6 +5,7 @@ const AuditLog = require('../models/AuditLog');
 const { sendEmail } = require('../services/sesService');
 const { sendSMS } = require('../services/snsService');
 const notificationService = require('../services/notificationService');
+const { escapeRegex } = require('../utils/escapeRegex');
 
 exports.getL2Queue = async (req, res) => {
     try {
@@ -17,9 +18,10 @@ exports.getL2Queue = async (req, res) => {
         }
 
         if (search) {
+            const safeSearch = escapeRegex(search);
             query.$or = [
-                { title: { $regex: search, $options: 'i' } },
-                { investorName: { $regex: search, $options: 'i' } }
+                { title: { $regex: safeSearch, $options: 'i' } },
+                { investorName: { $regex: safeSearch, $options: 'i' } }
             ];
             if (mongoose.Types.ObjectId.isValid(search)) {
                 query.$or.push({ _id: search });

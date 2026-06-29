@@ -9,7 +9,7 @@ const UserSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
-        unique: true,
+        unique: true,   // implicitly creates an index
         trim: true,
         lowercase: true
     },
@@ -54,10 +54,6 @@ const UserSchema = new mongoose.Schema({
         city: String,
         state: String,
     },
-    refreshTokens: {
-        type: [String],
-        default: []
-    },
     resetPasswordToken: String,
     resetPasswordExpires: Date,
     otpCode: String,
@@ -71,5 +67,11 @@ const UserSchema = new mongoose.Schema({
         default: false
     }
 }, { timestamps: true });
+
+// --- Indexes ---
+// email unique index is created by the schema field above.
+// Additional indexes for frequent query patterns:
+UserSchema.index({ role: 1 });                    // getAllUsers filtering by role
+UserSchema.index({ role: 1, isActive: 1 });       // getAgentActivities filtering
 
 module.exports = mongoose.model('User', UserSchema);

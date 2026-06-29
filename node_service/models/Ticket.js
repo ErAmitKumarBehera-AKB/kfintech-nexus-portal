@@ -52,7 +52,6 @@ const TicketSchema = new mongoose.Schema({
         type: [String],
         default: []
     },
-
     isPotentialFraud: {
         type: Boolean,
         default: false
@@ -115,12 +114,35 @@ const TicketSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'L1_REVIEW', 'L2_APPROVAL', 'APPROVED', 'REJECTED'],
+        enum: ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'L1_REVIEW', 'L2_APPROVAL', 'REJECTED'],
         default: 'OPEN'
     },
     resolvedAt: {
         type: Date
     }
 }, { timestamps: true });
+
+// --- Indexes ---
+// Investor dashboard: my tickets, ordered newest first
+TicketSchema.index({ investorId: 1, createdAt: -1 });
+
+// L1 queue: OPEN / IN_PROGRESS / L1_REVIEW tickets, newest first
+TicketSchema.index({ status: 1, createdAt: -1 });
+
+// L1 "assigned to me" filter
+TicketSchema.index({ assignedL1: 1, status: 1 });
+
+// Admin priority filter & fraud flag queries
+TicketSchema.index({ assignedPriority: 1 });
+TicketSchema.index({ isPotentialFraud: 1 });
+
+// Admin service-type breakdown
+TicketSchema.index({ serviceType: 1 });
+
+// SLA deadline scanning (for future SLA-breach jobs)
+TicketSchema.index({ 'slaTimeline.deadline': 1, status: 1 });
+
+// AutoClose job: RESOLVED tickets ready to close
+TicketSchema.index({ status: 1, resolvedAt: 1 });
 
 module.exports = mongoose.model('Ticket', TicketSchema);

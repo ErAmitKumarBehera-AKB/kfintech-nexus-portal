@@ -1,6 +1,5 @@
 const axios = require('axios');
 const ChatSession = require('../models/ChatSession');
-const Ticket = require('../models/Ticket');
 
 exports.getHistory = async (req, res) => {
     try {
