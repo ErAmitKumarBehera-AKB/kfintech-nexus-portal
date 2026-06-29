@@ -1,52 +1,37 @@
-const { SendEmailCommand } = require("@aws-sdk/client-ses");
-const { ses } = require("../config/aws");
-
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
 const sendEmail = async ({ to, subject, message }) => {
-    // If Resend credentials exist, use Resend (Production Deployment)
-    if (process.env.RESEND_API_KEY) {
-        try {
-            const resend = new Resend(process.env.RESEND_API_KEY);
-            const response = await resend.emails.send({
-                from: process.env.RESEND_FROM_EMAIL || 'FinnovaX <support@mail.swayamjethi.me>',
-                to: [to],
-                subject: subject,
+    try {
+        // If credentials are provided, use them to send a REAL email via Nodemailer
+        if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+            const transporter = nodemailer.createTransport({
+                service: 'gmail', // You can change this to your email provider
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS
+                }
+            });
+
+            const info = await transporter.sendMail({
+                from: `"FinnovaX" <${process.env.SMTP_USER}>`,
+                to,
+                subject,
                 html: message
             });
-            console.log(`[Resend Cloud] 📧 Email sent to ${to}. ID: ${response.data?.id}`);
-            return response;
-        } catch (error) {
-            console.error(`[Resend Cloud Error] Failed to send email to ${to}:`, error);
-            throw error;
+
+            console.log(`[Nodemailer] 📧 Email sent to ${to}. MessageId: ${info.messageId}`);
+            return info;
+        } else {
+            // Safe fallback if the user forgets to set SMTP_USER in .env
+            console.log('\n=========================================');
+            console.log('⚠️ [Nodemailer] SMTP Credentials not found in .env!');
+            console.log(`⚠️ Would have sent email to: ${to}`);
+            console.log(`⚠️ Subject: ${subject}`);
+            console.log('=========================================\n');
+            return null;
         }
-    }
-
-    // Fallback to AWS LocalStack (Local Development)
-    const params = {
-        Source: process.env.SES_FROM_EMAIL || "test@example.com",
-        Destination: {
-            ToAddresses: [to],
-        },
-        Message: {
-            Subject: {
-                Data: subject,
-            },
-            Body: {
-                Html: {
-                    Charset: "UTF-8",
-                    Data: message,
-                },
-            },
-        },
-    };
-
-    try {
-        const response = await ses.send(new SendEmailCommand(params));
-        console.log(`[AWS LocalStack] 📧 Email sent to ${to}. MessageId: ${response.MessageId}`);
-        return response;
     } catch (error) {
-        console.error(`[AWS LocalStack Error] Failed to send email to ${to}:`, error);
+        console.error(`[Nodemailer Error] Failed to send email to ${to}:`, error);
         throw error;
     }
 };
