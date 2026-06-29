@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { authApi } from '../../api/auth.api';
 import { Activity, Eye, EyeOff } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -9,16 +9,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PasswordRequirementsPopup, PasswordMatchPopup } from "@/components/common/PasswordPopups";
 
 const ForgotPasswordPage = () => {
-    const [email, setEmail] = useState('');
+    const location = useLocation();
+    const [email, setEmail] = useState(location.state?.email || '');
     const [otp, setOtp] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     
     const [isOtpStep, setIsOtpStep] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(30);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
+    useEffect(() => {
+        let timer;
+        if (isOtpStep && timeLeft > 0) {
+            timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+        }
+        return () => clearInterval(timer);
+    }, [isOtpStep, timeLeft]);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     
@@ -40,9 +49,25 @@ const ForgotPasswordPage = () => {
         try {
             await authApi.forgotPassword(email.trim().toLowerCase());
             setSuccessMessage('An OTP has been sent to your email.');
+            setTimeLeft(30);
             setIsOtpStep(true);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to process request.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleResendOtp = async () => {
+        setIsLoading(true);
+        setError('');
+        setSuccessMessage('');
+        try {
+            await authApi.forgotPassword(email.trim().toLowerCase());
+            setSuccessMessage('A new OTP has been sent to your email.');
+            setTimeLeft(30);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to resend OTP.');
         } finally {
             setIsLoading(false);
         }
@@ -140,6 +165,15 @@ const ForgotPasswordPage = () => {
                                         onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                                         className="bg-transparent border-zinc-200 focus-visible:ring-zinc-900 text-center tracking-widest text-lg"
                                     />
+                                    <div className="flex justify-end items-center text-xs mt-1">
+                                        {timeLeft > 0 ? (
+                                            <span className="text-zinc-500 font-medium">Resend code in <span className="text-zinc-900">{timeLeft}s</span></span>
+                                        ) : (
+                                            <button type="button" onClick={handleResendOtp} disabled={isLoading} className="text-zinc-900 font-semibold hover:underline disabled:opacity-50">
+                                                Resend OTP
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="grid gap-2">
@@ -227,7 +261,7 @@ const ForgotPasswordPage = () => {
 
                         <div className="mt-6 text-center text-sm text-zinc-500">
                             Remembered it?{' '}
-                            <Link to="/login" className="font-medium text-zinc-900 hover:underline underline-offset-4">
+                            <Link to="/login" state={{ email }} className="font-medium text-zinc-900 hover:underline underline-offset-4">
                                 Log in
                             </Link>
                         </div>
