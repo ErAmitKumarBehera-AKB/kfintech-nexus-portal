@@ -73,6 +73,28 @@ exports.updateProfile = async (req, res) => {
 
         const user = await userService.updateUserProfile(req.user.userId, updateData);
 
+        if (updateData.twoFactorType === 'EMAIL') {
+            const { sendEmail } = require('../../services/sesService');
+            try {
+                await sendEmail({
+                    to: currentUser.email,
+                    subject: 'FinnovaX — 2FA Preference Updated',
+                    message: `
+                        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #fbfbfb; padding: 40px 20px; color: #18181b; line-height: 1.6;">
+                            <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; padding: 40px; border: 1px solid #e4e4e7; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+                                <h2 style="color: #18181b; font-size: 20px; font-weight: 600; margin-top: 0;">2FA Preference Updated</h2>
+                                <p style="color: #52525b; font-size: 15px; margin-bottom: 24px;">Hello ${currentUser.name || 'Valued Investor'},</p>
+                                <p style="color: #52525b; font-size: 15px; margin-bottom: 24px;">This email is to confirm that your Two-Factor Authentication preference has been successfully changed to <strong>Email (OTP)</strong>.</p>
+                                <p style="color: #52525b; font-size: 15px; margin-bottom: 0;">Moving forward, all login OTPs will be sent to this email address.</p>
+                            </div>
+                        </div>
+                    `
+                });
+            } catch (emailError) {
+                console.error('Failed to send 2FA preference update email:', emailError);
+            }
+        }
+
         let missingFields = [];
         if (!complete) {
             if (!checkPhone) missingFields.push('Phone Number');

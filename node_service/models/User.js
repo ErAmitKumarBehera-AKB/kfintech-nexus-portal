@@ -69,6 +69,19 @@ const UserSchema = new mongoose.Schema({
     profileCompleted: {
         type: Boolean,
         default: false
+    },
+    twoFactorSecret: {
+        type: String,
+        select: false
+    },
+    twoFactorEnabled: {
+        type: Boolean,
+        default: false
+    },
+    twoFactorType: {
+        type: String,
+        enum: ['GOOGLE', 'EMAIL', 'PHONE'],
+        default: 'EMAIL'
     }
 }, { timestamps: true });
 

@@ -33,8 +33,24 @@ exports.initiateLogin = async (req, res) => {
             });
         }
 
+        // INVESTOR 2FA Handling
+        if (user.twoFactorType === 'GOOGLE' && user.twoFactorEnabled) {
+            return res.status(200).json({ 
+                message: '2FA required.', 
+                requiresOtp: true, 
+                type: 'GOOGLE', 
+                email: user.email 
+            });
+        }
+
+        // Fallback to EMAIL for 'EMAIL', 'PHONE' (disabled), or missing type
         await otpService.generateAndSendOTP(user);
-        return res.status(200).json({ message: 'OTP sent.', requiresOtp: true, email: user.email });
+        return res.status(200).json({ 
+            message: 'OTP sent via email.', 
+            requiresOtp: true, 
+            type: 'EMAIL', 
+            email: user.email 
+        });
     } catch (error) {
         console.error('[Auth] Login init error:', error);
         return res.status(500).json({ message: 'Internal server error.' });
@@ -46,20 +62,32 @@ exports.verifyOTP = async (req, res) => {
         const { email, otp } = req.body;
         if (!email || !otp) return res.status(400).json({ message: 'Email and OTP required.' });
 
-        const user = await userService.getUserByEmail(email);
-        if (!user || !user.otpCode || user.otpExpires < Date.now()) {
-            return res.status(401).json({ message: 'OTP expired or invalid.' });
+        const user = await require('../../models/User').findOne({ email: email.toLowerCase().trim() }).select('+twoFactorSecret');
+        
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
-        const isMatch = await passwordService.comparePassword(otp, user.otpCode);
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid OTP.' });
+        if (user.twoFactorType === 'GOOGLE' && user.twoFactorEnabled) {
+            const { verify } = require('otplib');
+            const isValid = verify({ token: otp, secret: user.twoFactorSecret });
+            if (!isValid) {
+                return res.status(401).json({ message: 'Invalid Google Authenticator code.' });
+            }
+        } else {
+            // Email OTP Verification
+            if (!user.otpCode || user.otpExpires < Date.now()) {
+                return res.status(401).json({ message: 'OTP expired or invalid.' });
+            }
+            const isMatch = await passwordService.comparePassword(otp, user.otpCode);
+            if (!isMatch) {
+                return res.status(401).json({ message: 'Invalid OTP.' });
+            }
+            // Clear OTP state
+            user.otpCode = undefined;
+            user.otpExpires = undefined;
+            await user.save();
         }
-
-        // Clear OTP state
-        user.otpCode = undefined;
-        user.otpExpires = undefined;
-        await user.save();
 
         const accessToken = tokenService.generateAccessToken(user);
         const refreshToken = await tokenService.generateRefreshToken(user._id);
