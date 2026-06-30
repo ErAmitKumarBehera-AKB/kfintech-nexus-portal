@@ -9,6 +9,8 @@ import Documents from '../components/investor/Documents';
 import NotificationsView from '../components/investor/NotificationsView';
 import { useAuth } from '../context/AuthContext';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import ThemeToggle from '../components/common/ThemeToggle';
+import DotBackgroundDemo from "@/components/ui/DotBackgroundDemo";
 
 const InvestorDashboard = () => {
     const { user } = useAuth();
@@ -67,15 +69,19 @@ const InvestorDashboard = () => {
         <SidebarProvider>
             <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
             
-            <SidebarInset className="bg-zinc-50 min-h-screen flex flex-col">
-                <header className="flex h-14 shrink-0 items-center gap-2 border-b border-zinc-200 bg-white px-4">
-                    <SidebarTrigger className="-ml-1" />
-                    <div className="w-px h-4 bg-zinc-200 mx-2" />
-                    <h1 className="font-medium text-sm text-zinc-900">
-                        {getPageTitle()}
-                    </h1>
+            <SidebarInset className="bg-zinc-50 dark:bg-black min-h-screen flex flex-col transition-colors duration-500 relative overflow-hidden">
+                <DotBackgroundDemo />
+                <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#131313] px-4 transition-colors duration-500 relative z-10">
+                    <div className="flex items-center gap-2">
+                        <SidebarTrigger className="-ml-1 text-zinc-900 dark:text-zinc-100" />
+                        <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-800 mx-2" />
+                        <h1 className="font-medium text-sm text-zinc-900 dark:text-zinc-100">
+                            {getPageTitle()}
+                        </h1>
+                    </div>
+                    <ThemeToggle />
                 </header>
-                <main className="flex-1 p-4 md:p-6 overflow-auto">
+                <main className="flex-1 p-4 md:p-6 overflow-auto relative z-10">
                     {isProfileIncomplete && activeTab !== 'profile' && (
                         <ProfileCompletionModal onGoToProfile={() => handleTabChange('profile')} />
                     )}

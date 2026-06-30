@@ -54,11 +54,11 @@ const SLAProgressBar = ({ currentStatus, timeline = [] }) => {
         <div className="w-full py-4">
             <div className="relative flex justify-between items-center w-full px-8">
                 {/* Background Track */}
-                <div className="absolute left-8 right-8 top-1/2 h-1 -translate-y-1/2 bg-zinc-100 rounded-full" />
+                <div className="absolute left-8 right-8 top-1/2 h-1 -translate-y-1/2 bg-zinc-100 dark:bg-zinc-800 rounded-full" />
                 
                 {/* Active Progress Track */}
                 <motion.div 
-                    className="absolute left-8 top-1/2 h-1 -translate-y-1/2 bg-zinc-900 rounded-full"
+                    className="absolute left-8 top-1/2 h-1 -translate-y-1/2 bg-zinc-900 dark:bg-zinc-100 rounded-full"
                     initial={{ scaleX: 0 }}
                     animate={{ scaleX: safeIndex / (displaySteps.length - 1) }}
                     transition={{ duration: 0.8, ease: "easeInOut" }}
@@ -72,13 +72,13 @@ const SLAProgressBar = ({ currentStatus, timeline = [] }) => {
                     const dateReached = getStepDate(step.id);
                     const StepIcon = step.icon;
 
-                    let nodeColor = 'bg-white border-zinc-200 text-zinc-400';
+                    let nodeColor = 'bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-500';
                     if (isCompleted) {
                         nodeColor = isRejected && isActive 
-                            ? 'bg-red-600 border-red-600 text-white'
-                            : 'bg-zinc-900 border-zinc-900 text-white';
+                            ? 'bg-red-600 dark:bg-red-700 border-red-600 dark:border-red-700 text-white'
+                            : 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-100 text-white dark:text-zinc-900';
                     } else if (isActive && !isRejected) {
-                        nodeColor = 'bg-zinc-900 border-zinc-900 text-white shadow-sm ring-2 ring-zinc-200';
+                        nodeColor = 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-100 text-white dark:text-zinc-900 shadow-sm ring-2 ring-zinc-200 dark:ring-zinc-800';
                     }
 
                     return (
@@ -91,11 +91,11 @@ const SLAProgressBar = ({ currentStatus, timeline = [] }) => {
                             </motion.div>
                             
                             <div className="absolute top-12 text-center w-28 -ml-14 left-1/2">
-                                <p className={`text-xs font-semibold ${isCompleted ? (isRejected && isActive ? 'text-red-600' : 'text-zinc-900') : 'text-zinc-400'}`}>
+                                <p className={`text-xs font-semibold ${isCompleted ? (isRejected && isActive ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-zinc-100') : 'text-zinc-400 dark:text-zinc-500'}`}>
                                     {step.label}
                                 </p>
                                 {dateReached && (
-                                    <p className="text-[10px] text-zinc-500 mt-0.5">
+                                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                                         {format(new Date(dateReached), 'MMM dd, HH:mm')}
                                     </p>
                                 )}

@@ -100,53 +100,53 @@ const TicketDetail = ({ ticketId, onBack }) => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                    <Card className="border-zinc-200 shadow-sm overflow-hidden">
-                        <div className="bg-zinc-50 p-6 border-b border-zinc-100">
+                    <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden bg-white dark:bg-[#131313]">
+                        <div className="bg-zinc-50 dark:bg-[#1A1A1A] p-6 border-b border-zinc-100 dark:border-zinc-800">
                             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium text-zinc-500">
+                                    <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
                                         Ticket #{ticket._id.toString().slice(-6).toUpperCase()}
                                     </span>
-                                    <Badge variant="outline" className="bg-white">{ticket.serviceType}</Badge>
+                                    <Badge variant="outline" className="bg-white dark:bg-[#131313] dark:text-zinc-100 dark:border-zinc-800">{ticket.serviceType}</Badge>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-xs text-zinc-500">Created on</p>
-                                    <p className="text-sm font-medium text-zinc-900">{format(new Date(ticket.createdAt), 'MMMM dd, yyyy')}</p>
+                                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Created on</p>
+                                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{format(new Date(ticket.createdAt), 'MMMM dd, yyyy')}</p>
                                 </div>
                             </div>
-                            <h1 className="text-2xl font-semibold text-zinc-900 leading-tight">{ticket.title || ticket.serviceType}</h1>
+                            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 leading-tight">{ticket.title || ticket.serviceType}</h1>
                         </div>
 
                         <CardContent className="p-6">
                             <div className="space-y-6">
                                 <div>
                                     <div className="flex items-center gap-2 mb-3">
-                                        <Clock className="w-4 h-4 text-zinc-500" /> 
-                                        <h3 className="font-medium text-zinc-900">SLA Progress</h3>
-                                        <span className="ml-auto text-xs text-zinc-500">
+                                        <Clock className="w-4 h-4 text-zinc-500 dark:text-zinc-400" /> 
+                                        <h3 className="font-medium text-zinc-900 dark:text-zinc-100">SLA Progress</h3>
+                                        <span className="ml-auto text-xs text-zinc-500 dark:text-zinc-400">
                                             Deadline: {ticket.slaTimeline?.deadline ? format(new Date(ticket.slaTimeline.deadline), 'MMM dd, yyyy') : 'N/A'}
                                         </span>
                                     </div>
                                     <SLAProgressBar currentStatus={ticket.status} timeline={timeline} />
                                 </div>
                                 
-                                <Separator />
+                                <Separator className="bg-zinc-200 dark:bg-zinc-800" />
 
                                 <div>
-                                    <h3 className="font-medium text-zinc-900 mb-2">Description</h3>
-                                    <div className="bg-zinc-50 p-4 rounded-lg border border-zinc-100">
-                                        <p className="text-sm text-zinc-700 whitespace-pre-wrap">{ticket.description}</p>
+                                    <h3 className="font-medium text-zinc-900 dark:text-zinc-100 mb-2">Description</h3>
+                                    <div className="bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                                        <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">{ticket.description}</p>
                                     </div>
                                 </div>
 
                                 {ticket.serviceMetadata && Object.keys(ticket.serviceMetadata).length > 0 && (
                                     <div>
-                                        <h3 className="font-medium text-zinc-900 mb-3">Service Details</h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white border border-zinc-200 rounded-lg p-4">
+                                        <h3 className="font-medium text-zinc-900 dark:text-zinc-100 mb-3">Service Details</h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-[#131313] border border-zinc-200 dark:border-zinc-800 rounded-lg p-4">
                                             {Object.entries(ticket.serviceMetadata).map(([key, value]) => (
                                                 <div key={key} className="space-y-1">
-                                                    <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                                                    <p className="text-sm font-medium text-zinc-900">{value}</p>
+                                                    <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{value}</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -156,58 +156,19 @@ const TicketDetail = ({ ticketId, onBack }) => {
                         </CardContent>
                     </Card>
 
-                    <Card className="border-zinc-200 shadow-sm">
-                        <CardHeader className="pb-3 border-b border-zinc-100">
-                            <CardTitle className="text-lg font-medium">Comments</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <ScrollArea className="h-[300px] p-6">
-                                <div className="space-y-4">
-                                    {ticket.comments?.map((comment, idx) => (
-                                        <div key={idx} className={`p-4 rounded-lg ${comment.authorRole === 'INVESTOR' ? 'bg-zinc-100 ml-8' : 'bg-white border border-zinc-200 mr-8'}`}>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className={`text-xs font-semibold ${comment.authorRole === 'INVESTOR' ? 'text-zinc-900' : 'text-blue-600'}`}>
-                                                    {comment.authorRole.replace('_', ' ')}
-                                                </span>
-                                                <span className="text-[10px] text-zinc-500">{format(new Date(comment.createdAt), 'MMM dd, HH:mm')}</span>
-                                            </div>
-                                            <p className="text-sm text-zinc-700 whitespace-pre-wrap">{comment.message}</p>
-                                        </div>
-                                    ))}
-                                    {(!ticket.comments || ticket.comments.length === 0) && (
-                                        <div className="text-center text-sm text-zinc-500 py-8">No comments yet.</div>
-                                    )}
-                                </div>
-                            </ScrollArea>
-                            <div className="p-4 border-t border-zinc-100 bg-zinc-50">
-                                <form onSubmit={handleAddComment} className="flex gap-2">
-                                    <Input 
-                                        type="text" 
-                                        value={newComment}
-                                        onChange={(e) => setNewComment(e.target.value)}
-                                        placeholder="Add a comment..."
-                                        className="bg-white"
-                                    />
-                                    <Button type="submit" disabled={submittingComment || !newComment.trim()} className="bg-zinc-900 text-white shrink-0">
-                                        {submittingComment ? 'Sending...' : <><Send className="w-4 h-4 mr-2"/> Post</>}
-                                    </Button>
-                                </form>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    
-                    <Card className="border-zinc-200 shadow-sm">
-                        <CardHeader className="pb-3 border-b border-zinc-100">
-                            <CardTitle className="text-lg font-medium">Activity Timeline</CardTitle>
+
+                    <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-[#131313]">
+                        <CardHeader className="pb-3 border-b border-zinc-100 dark:border-zinc-800">
+                            <CardTitle className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Activity Timeline</CardTitle>
                         </CardHeader>
                         <CardContent className="p-6">
-                            <div className="space-y-4 border-l-2 border-zinc-100 ml-2 pl-4">
+                            <div className="space-y-4 border-l-2 border-zinc-100 dark:border-zinc-800 ml-2 pl-4">
                                 {timeline.map((log, index) => (
                                     <div key={log._id} className="relative">
-                                        <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-zinc-300 ring-4 ring-white" />
-                                        <p className="text-sm font-medium text-zinc-900">{log.action.replace(/_/g, ' ')}</p>
-                                        {log.details?.note && <p className="text-sm text-zinc-600 mt-0.5">{log.details.note}</p>}
-                                        <p className="text-xs text-zinc-400 mt-1">{format(new Date(log.createdAt || log.timestamp), 'MMM dd, yyyy HH:mm')}</p>
+                                        <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-zinc-300 dark:bg-zinc-700 ring-4 ring-white dark:ring-[#131313]" />
+                                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{log.action.replace(/_/g, ' ')}</p>
+                                        {log.details?.note && <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-0.5">{log.details.note}</p>}
+                                        <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">{format(new Date(log.createdAt || log.timestamp), 'MMM dd, yyyy HH:mm')}</p>
                                     </div>
                                 ))}
                             </div>
@@ -216,47 +177,47 @@ const TicketDetail = ({ ticketId, onBack }) => {
                 </div>
 
                 <div className="space-y-6">
-                    <Card className="border-zinc-200 shadow-sm">
-                        <CardHeader className="pb-3 border-b border-zinc-100">
-                            <CardTitle className="text-lg font-medium">Documents</CardTitle>
+                    <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-[#131313]">
+                        <CardHeader className="pb-3 border-b border-zinc-100 dark:border-zinc-800">
+                            <CardTitle className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Documents</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 space-y-3">
                             {ticket.documents && ticket.documents.length > 0 ? (
                                 ticket.documents.map((doc, idx) => (
-                                    <div key={idx} className="flex items-center justify-between p-3 border border-zinc-200 rounded-lg bg-zinc-50">
+                                    <div key={idx} className="flex items-center justify-between p-3 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-zinc-50 dark:bg-[#1A1A1A]">
                                         <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="p-2 bg-white rounded border border-zinc-100 shrink-0">
-                                                <FileText className="w-4 h-4 text-zinc-500" />
+                                            <div className="p-2 bg-white dark:bg-[#131313] rounded border border-zinc-100 dark:border-zinc-800 shrink-0">
+                                                <FileText className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
                                             </div>
                                             <div className="truncate">
-                                                <p className="text-sm font-medium text-zinc-900 truncate">{doc.name}</p>
-                                                <p className="text-xs text-zinc-500">{(doc.size / 1024).toFixed(1)} KB</p>
+                                                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{doc.name}</p>
+                                                <p className="text-xs text-zinc-500 dark:text-zinc-400">{(doc.size / 1024).toFixed(1)} KB</p>
                                             </div>
                                         </div>
-                                        <a href={doc.s3Key} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-zinc-200 rounded-md transition-colors text-zinc-500 hover:text-zinc-900 shrink-0">
+                                        <a href={doc.s3Key} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 shrink-0">
                                             <Download className="w-4 h-4" />
                                         </a>
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-sm text-zinc-500 text-center py-4">No documents attached.</p>
+                                <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center py-4">No documents attached.</p>
                             )}
                         </CardContent>
                     </Card>
                     
-                    <Card className="border-zinc-200 shadow-sm">
+                    <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-[#131313]">
                         <CardContent className="p-5 space-y-4">
                             <div>
-                                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-1">Priority Level</p>
-                                <Badge variant="secondary" className="bg-zinc-100 text-zinc-900">
+                                <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-1">Priority Level</p>
+                                <Badge variant="secondary" className="bg-zinc-100 dark:bg-[#1A1A1A] text-zinc-900 dark:text-zinc-100 dark:border-zinc-800">
                                     {ticket.assignedPriority || 'UNASSIGNED'}
                                 </Badge>
                             </div>
                             
                             {ticket.isPotentialFraud && (
-                                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                                    <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
-                                    <p className="text-xs text-red-800 font-medium">Flagged for manual review by AI system.</p>
+                                <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-lg flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+                                    <p className="text-xs text-red-800 dark:text-red-300 font-medium">Flagged for manual review by AI system.</p>
                                 </div>
                             )}
                         </CardContent>

@@ -61,24 +61,24 @@ const MyTickets = ({ onSelectTicket }) => {
         <div className="space-y-6 max-w-5xl mx-auto">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-semibold text-zinc-900">My Tickets</h1>
-                    <p className="text-sm text-zinc-500 mt-1">Track your service requests and SLA timelines.</p>
+                    <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">My Tickets</h1>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Track your service requests and SLA timelines.</p>
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="relative w-full sm:w-[200px]">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                         <Input 
                             type="text" 
                             placeholder="Search..." 
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 bg-white"
+                            className="pl-9 bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                         />
                     </div>
                     
                     <Select value={filter} onValueChange={(val) => { setFilter(val); setPage(1); }}>
-                        <SelectTrigger className="w-[140px] bg-white text-xs sm:text-sm">
+                        <SelectTrigger className="w-[140px] bg-white dark:bg-[#131313] text-xs sm:text-sm border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
                             <SelectValue placeholder="All Status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -91,7 +91,7 @@ const MyTickets = ({ onSelectTicket }) => {
                     </Select>
 
                     <Select value={serviceFilter} onValueChange={(val) => { setServiceFilter(val); setPage(1); }}>
-                        <SelectTrigger className="w-[180px] bg-white text-xs sm:text-sm">
+                        <SelectTrigger className="w-[180px] bg-white dark:bg-[#131313] text-xs sm:text-sm border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
                             <SelectValue placeholder="All Services" />
                         </SelectTrigger>
                         <SelectContent>
@@ -110,31 +110,31 @@ const MyTickets = ({ onSelectTicket }) => {
                         <Card 
                             key={ticket._id} 
                             onClick={() => onSelectTicket(ticket._id)}
-                            className="cursor-pointer hover:border-zinc-300 hover:shadow-md transition-all duration-200 group"
+                            className="cursor-pointer bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all duration-200 group"
                         >
                             <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs font-semibold text-zinc-500">#{ticket._id.toString().slice(-6).toUpperCase()}</span>
+                                        <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">#{ticket._id.toString().slice(-6).toUpperCase()}</span>
                                         <Badge variant="secondary" className={getStatusColor(ticket.status)}>
                                             {ticket.status.replace('_', ' ')}
                                         </Badge>
                                         {ticket.assignedPriority && (
-                                            <Badge variant="outline" className="text-xs text-zinc-600 bg-white">
+                                            <Badge variant="outline" className="text-xs text-zinc-600 dark:text-zinc-300 bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-700">
                                                 {ticket.assignedPriority}
                                             </Badge>
                                         )}
                                     </div>
                                     <div>
-                                        <h3 className="font-semibold text-zinc-900 group-hover:text-zinc-700 transition-colors">{ticket.title || ticket.serviceType}</h3>
-                                        <p className="text-sm text-zinc-500 line-clamp-1 mt-0.5">{ticket.description}</p>
+                                        <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 transition-colors">{ticket.title || ticket.serviceType}</h3>
+                                        <p className="text-sm text-zinc-500 dark:text-zinc-400 line-clamp-1 mt-0.5">{ticket.description}</p>
                                     </div>
                                 </div>
-                                <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between shrink-0 gap-1 text-xs text-zinc-500">
+                                <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between shrink-0 gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                                     <p>Created {format(new Date(ticket.createdAt), 'MMM dd, yyyy')}</p>
-                                    <div className="flex items-center gap-1.5 mt-1 sm:mt-0 bg-zinc-100 px-2.5 py-1 rounded-md border border-zinc-200">
-                                        <Clock className="h-3.5 w-3.5 text-zinc-600" />
-                                        <span className="font-medium text-zinc-800">
+                                    <div className="flex items-center gap-1.5 mt-1 sm:mt-0 bg-zinc-100 dark:bg-zinc-800/50 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-800">
+                                        <Clock className="h-3.5 w-3.5 text-zinc-600 dark:text-zinc-400" />
+                                        <span className="font-medium text-zinc-800 dark:text-zinc-200">
                                             SLA: {ticket.slaTimeline?.slaDays || 7} Days
                                         </span>
                                     </div>
@@ -143,12 +143,12 @@ const MyTickets = ({ onSelectTicket }) => {
                         </Card>
                     ))
                 ) : (
-                    <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed border-zinc-200 bg-zinc-50/50">
-                        <div className="h-12 w-12 rounded-full bg-white border border-zinc-100 shadow-sm flex items-center justify-center mb-4">
-                            <Filter className="h-5 w-5 text-zinc-400" />
+                    <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-black/20">
+                        <div className="h-12 w-12 rounded-full bg-white dark:bg-[#131313] border border-zinc-100 dark:border-zinc-800 shadow-sm flex items-center justify-center mb-4">
+                            <Filter className="h-5 w-5 text-zinc-400 dark:text-zinc-500" />
                         </div>
-                        <h3 className="text-base font-medium text-zinc-900">No tickets found</h3>
-                        <p className="text-sm text-zinc-500 max-w-sm mt-1">You haven't raised any requests that match this filter.</p>
+                        <h3 className="text-base font-medium text-zinc-900 dark:text-zinc-100">No tickets found</h3>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm mt-1">You haven't raised any requests that match this filter.</p>
                     </Card>
                 )}
             </div>
@@ -161,20 +161,20 @@ const MyTickets = ({ onSelectTicket }) => {
                         size="sm"
                         disabled={page === 1}
                         onClick={() => setPage(p => Math.max(1, p - 1))}
-                        className="bg-white"
+                        className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
                     >
                         <ChevronLeft className="h-4 w-4 mr-1" />
                         Previous
                     </Button>
-                    <span className="text-sm text-zinc-500">
-                        Page <span className="font-medium text-zinc-900">{page}</span> of <span className="font-medium text-zinc-900">{totalPages}</span>
+                    <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                        Page <span className="font-medium text-zinc-900 dark:text-zinc-100">{page}</span> of <span className="font-medium text-zinc-900 dark:text-zinc-100">{totalPages}</span>
                     </span>
                     <Button
                         variant="outline"
                         size="sm"
                         disabled={page === totalPages}
                         onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        className="bg-white"
+                        className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
                     >
                         Next
                         <ChevronRight className="h-4 w-4 ml-1" />

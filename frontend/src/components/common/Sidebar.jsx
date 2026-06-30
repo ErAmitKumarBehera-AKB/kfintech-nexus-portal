@@ -111,7 +111,7 @@ const AppSidebar = ({ activeTab, onTabChange }) => {
             cx="20"
             cy="20"
             r={radius}
-            className="stroke-zinc-200"
+            className="stroke-zinc-200 dark:stroke-zinc-800"
             strokeWidth="2"
             fill="transparent"
           />
@@ -129,23 +129,23 @@ const AppSidebar = ({ activeTab, onTabChange }) => {
           />
         </svg>
         <Avatar className="h-8 w-8 rounded-full">
-          <AvatarFallback className="rounded-full bg-zinc-100 text-zinc-900 border border-zinc-200 font-medium">{initials}</AvatarFallback>
+          <AvatarFallback className="rounded-full bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 font-medium">{initials}</AvatarFallback>
         </Avatar>
       </div>
     );
 
     return (
-      <Sidebar collapsible="icon" className="border-r border-zinc-200">
+      <Sidebar collapsible="icon" className="border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#131313] transition-colors duration-500">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground pointer-events-none">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-zinc-900 text-zinc-50">
+              <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground pointer-events-none hover:bg-transparent">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-zinc-900 dark:bg-white text-zinc-50 dark:text-zinc-900 shadow-sm">
                   <GalleryVerticalEnd className="size-4" />
                 </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
+                <div className="grid flex-1 text-left text-sm leading-tight text-zinc-900 dark:text-zinc-100">
                   <span className="truncate font-semibold">Nexus Portal</span>
-                  <span className="truncate text-xs text-zinc-500">Investor Hub</span>
+                  <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">Investor Hub</span>
                 </div>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -154,7 +154,7 @@ const AppSidebar = ({ activeTab, onTabChange }) => {
 
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel className="text-zinc-500">Navigation</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-zinc-500 dark:text-zinc-400">Navigation</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {navItems.map((item) => (
@@ -163,11 +163,12 @@ const AppSidebar = ({ activeTab, onTabChange }) => {
                       isActive={activeTab === item.id}
                       onClick={() => onTabChange(item.id)}
                       tooltip={item.title}
+                      className="text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-50 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 data-[active=true]:bg-zinc-100 dark:data-[active=true]:bg-zinc-800 data-[active=true]:text-zinc-900 dark:data-[active=true]:text-zinc-50 transition-colors"
                     >
-                      <item.icon />
-                      <span className="flex-1">{item.title}</span>
+                      <item.icon className="h-4 w-4" />
+                      <span className="flex-1 font-medium">{item.title}</span>
                       {item.id === 'notifications' && unreadCount > 0 && (
-                          <div className="ml-auto flex h-5 min-w-[20px] px-1 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white shadow-sm animate-in fade-in zoom-in">
+                          <div className="ml-auto flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px] font-semibold text-zinc-900 dark:text-zinc-100 shadow-sm animate-in fade-in zoom-in">
                               {unreadCount > 99 ? '99+' : unreadCount}
                           </div>
                       )}
@@ -183,38 +184,38 @@ const AppSidebar = ({ activeTab, onTabChange }) => {
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
-                <DropdownMenuTrigger className="flex w-full items-center gap-3 overflow-hidden rounded-md p-2 text-left text-sm hover:bg-zinc-100 focus-visible:ring-2 data-[state=open]:bg-zinc-100 data-[state=open]:text-zinc-900 h-12 outline-none">
+                <DropdownMenuTrigger className="flex w-full items-center gap-3 overflow-hidden rounded-md p-2 text-left text-sm text-zinc-900 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 focus-visible:ring-2 data-[state=open]:bg-zinc-100 dark:data-[state=open]:bg-zinc-800 data-[state=open]:text-zinc-900 dark:data-[state=open]:text-zinc-100 h-12 outline-none transition-colors">
                     <AvatarWithRing />
                     <div className="grid flex-1 text-left text-sm leading-tight">
                       <span className="truncate font-medium">{userName}</span>
-                      <span className="truncate text-xs text-zinc-500">{userEmail}</span>
+                      <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">{userEmail}</span>
                     </div>
-                    <ChevronsUpDown className="ml-auto size-4 text-zinc-500" />
+                    <ChevronsUpDown className="ml-auto size-4 text-zinc-500 dark:text-zinc-400" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                  className="w-56 rounded-lg bg-white border border-zinc-200 shadow-md"
+                  className="w-56 rounded-lg bg-white dark:bg-[#131313] border border-zinc-200 dark:border-zinc-800 shadow-md"
                   side={isMobile ? "bottom" : "right"}
                   align="end"
                   sideOffset={4}
                 >
                   <div className="px-2 py-2">
-                    <div className="flex items-center gap-3 text-left text-sm">
+                    <div className="flex items-center gap-3 text-left text-sm text-zinc-900 dark:text-zinc-100">
                       <AvatarWithRing />
                       <div className="grid flex-1 text-left text-sm leading-tight">
                         <span className="truncate font-medium">{userName}</span>
-                        <span className="truncate text-xs text-zinc-500">{userEmail}</span>
+                        <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">{userEmail}</span>
                       </div>
                     </div>
                   </div>
-                  <DropdownMenuSeparator className="bg-zinc-200" />
-                  <DropdownMenuItem onClick={() => onTabChange('profile')} className="cursor-pointer hover:bg-zinc-100 focus:bg-zinc-100">
+                  <DropdownMenuSeparator className="bg-zinc-200 dark:bg-zinc-800" />
+                  <DropdownMenuItem onClick={() => onTabChange('profile')} className="cursor-pointer text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-50 hover:bg-zinc-100 dark:hover:bg-zinc-800 focus:bg-zinc-100 dark:focus:bg-zinc-800">
                     <Settings className="mr-2 h-4 w-4" />
                     Profile & KYC
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-zinc-200" />
+                  <DropdownMenuSeparator className="bg-zinc-200 dark:bg-zinc-800" />
                   <DropdownMenuItem onClick={() => {
                     if (logout) logout();
-                  }} className="cursor-pointer text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-600">
+                  }} className="cursor-pointer text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 focus:bg-red-50 dark:focus:bg-red-950/50 focus:text-red-600 dark:focus:text-red-400">
                     <LogOut className="mr-2 h-4 w-4" />
                     Log out
                   </DropdownMenuItem>

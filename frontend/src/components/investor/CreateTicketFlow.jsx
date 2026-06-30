@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { SERVICE_TYPE_LIST, getServiceType } from '../../config/serviceTypes';
 import { useAuth } from '../../context/AuthContext';
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,7 +59,7 @@ const StepIndicator = ({ current }) => {
                             >
                                 {done ? <Check className="w-4 h-4 text-white" /> : step.num}
                             </motion.div>
-                            <span className={`text-xs font-medium text-center ${active || done ? 'text-zinc-900' : 'text-zinc-400'}`}>
+                            <span className={`text-xs font-medium text-center ${active || done ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-500'}`}>
                                 {step.label}
                             </span>
                         </div>
@@ -80,8 +81,8 @@ const ServiceCard = ({ config, isSelected, onClick }) => {
             whileTap={{ scale: 0.98 }}
             className={`relative text-left w-full rounded-xl border p-4 cursor-pointer transition-all duration-200 flex flex-col gap-3 ${
                 isSelected
-                    ? 'border-zinc-900 bg-zinc-50 shadow-sm ring-1 ring-zinc-900'
-                    : 'border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm'
+                    ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-50 dark:bg-[#1A1A1A] shadow-sm ring-1 ring-zinc-900 dark:ring-zinc-100'
+                    : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#131313] hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm'
             }`}
         >
             <AnimatePresence>
@@ -90,24 +91,24 @@ const ServiceCard = ({ config, isSelected, onClick }) => {
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
-                        className="absolute top-3 right-3 w-5 h-5 bg-zinc-900 rounded-full flex items-center justify-center"
+                        className="absolute top-3 right-3 w-5 h-5 bg-zinc-900 dark:bg-zinc-100 rounded-full flex items-center justify-center"
                     >
-                        <Check className="w-3 h-3 text-white" />
+                        <Check className="w-3 h-3 text-white dark:text-zinc-900" />
                     </motion.div>
                 )}
             </AnimatePresence>
 
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                isSelected ? 'bg-zinc-200 text-zinc-900' : 'bg-zinc-100 text-zinc-500'
+                isSelected ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400'
             }`}>
                 <Icon className="w-5 h-5" />
             </div>
 
             <div>
-                <h3 className={`font-semibold text-sm mb-0.5 transition-colors ${isSelected ? 'text-zinc-900' : 'text-zinc-700'}`}>
+                <h3 className={`font-semibold text-sm mb-0.5 transition-colors ${isSelected ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-700 dark:text-zinc-300'}`}>
                     {config.label}
                 </h3>
-                <p className="text-xs text-zinc-500 line-clamp-2">{config.description}</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">{config.description}</p>
             </div>
 
             <div className="flex items-center gap-1.5 mt-auto pt-2">
@@ -125,7 +126,7 @@ const MetadataField = ({ field, value, onChange }) => {
     if (field.type === 'select') {
         return (
             <Select value={value || ''} onValueChange={(val) => onChange({ target: { name: field.name, value: val } })}>
-                <SelectTrigger className="w-full bg-white">
+                <SelectTrigger className="w-full bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
                     <SelectValue placeholder={`Select ${field.label}`} />
                 </SelectTrigger>
                 <SelectContent>
@@ -134,15 +135,27 @@ const MetadataField = ({ field, value, onChange }) => {
             </Select>
         );
     }
+    if (field.type === 'textarea') {
+        return (
+            <Textarea 
+                name={field.name}
+                value={value || ''} 
+                onChange={onChange} 
+                placeholder={field.placeholder}
+                required={field.required}
+                className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 min-h-[100px]"
+            />
+        );
+    }
     return (
         <Input 
-            type={field.type || 'text'} 
+            type={field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : 'text'} 
             name={field.name} 
             value={value || ''}
             onChange={onChange} 
             placeholder={field.placeholder}
             required={field.required} 
-            className="bg-white"
+            className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
         />
     );
 };
@@ -150,9 +163,9 @@ const MetadataField = ({ field, value, onChange }) => {
 // Request Review
 const ReviewRow = ({ label, value }) => (
     value ? (
-        <div className="flex justify-between items-start py-3 border-b border-zinc-100 last:border-0 gap-4">
-            <span className="text-xs font-medium text-zinc-500 shrink-0">{label}</span>
-            <span className="text-sm text-zinc-900 font-medium text-right">{value}</span>
+        <div className="flex justify-between items-start py-3 border-b border-zinc-100 dark:border-zinc-800 last:border-0 gap-4">
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 shrink-0">{label}</span>
+            <span className="text-sm text-zinc-900 dark:text-zinc-100 font-medium text-right">{value}</span>
         </div>
     ) : null
 );
@@ -225,25 +238,28 @@ const CreateTicketFlow = ({ onTabChange }) => {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            setStatus({
-                type: 'success',
-                message: `${serviceConfig.label} request submitted successfully. Redirecting to your tickets...`
+            toast.success(`${serviceConfig.label} request submitted`, {
+                description: 'Your request has been securely logged.',
+                action: {
+                    label: 'Notifications',
+                    onClick: () => {
+                        if (onTabChange) onTabChange('notifications');
+                    }
+                }
             });
+            
             setSelectedType(null);
             setFormData({ title: '', description: '', investorName: user?.name || '', accountNumber: '' });
             setServiceMetadata({});
             setFile(null);
             
-            // Route back to My Tickets
+            // Route back to My Tickets after a moment
             setTimeout(() => {
                 if (onTabChange) onTabChange('tickets');
-            }, 2000);
+            }, 1000);
 
         } catch (error) {
-            setStatus({
-                type: 'error',
-                message: error.response?.data?.message || 'Failed to submit request.'
-            });
+            toast.error(error.response?.data?.message || 'Failed to submit request.');
         } finally {
             setIsSubmitting(false);
         }
@@ -255,8 +271,8 @@ const CreateTicketFlow = ({ onTabChange }) => {
     return (
         <div className="max-w-4xl mx-auto space-y-8">
             <header className="text-center">
-                <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">Create Service Request</h1>
-                <p className="text-zinc-500 mt-1 text-sm">Select a category and provide details for your request.</p>
+                <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">Create Service Request</h1>
+                <p className="text-zinc-500 dark:text-zinc-400 mt-1 text-sm">Select a category and provide details for your request.</p>
             </header>
 
             <StepIndicator current={step} />
@@ -317,15 +333,15 @@ const CreateTicketFlow = ({ onTabChange }) => {
 
                 {step === 2 && currentConfig && (
                     <motion.div key="step2" variants={variants} initial="initial" animate="animate" exit="exit" className="space-y-6">
-                        <Card className="border-zinc-200 shadow-sm bg-white">
+                        <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-[#131313]">
                             <CardContent className="p-6 space-y-6">
-                                <div className="flex items-center gap-3 pb-4 border-b border-zinc-100">
-                                    <div className="w-10 h-10 rounded-lg bg-zinc-100 text-zinc-900 flex items-center justify-center">
+                                <div className="flex items-center gap-3 pb-4 border-b border-zinc-100 dark:border-zinc-800">
+                                    <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center">
                                         {React.createElement(currentConfig.icon, { className: "w-5 h-5" })}
                                     </div>
                                     <div>
-                                        <p className="text-sm font-semibold text-zinc-900">{currentConfig.label}</p>
-                                        <p className="text-xs text-zinc-500 flex items-center gap-1 mt-0.5">
+                                        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{currentConfig.label}</p>
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1 mt-0.5">
                                             <Clock className="w-3 h-3" /> SLA: {currentConfig.expectedSLA}
                                         </p>
                                     </div>
@@ -334,27 +350,32 @@ const CreateTicketFlow = ({ onTabChange }) => {
                                 <form ref={formRef} id="service-form" onSubmit={handleGoToReview} className="space-y-6">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <Label>Investor Name</Label>
-                                            <Input type="text" name="investorName" value={formData.investorName} readOnly className="bg-zinc-50 text-zinc-500 border-zinc-200" />
+                                            <Label className="text-zinc-900 dark:text-zinc-100">Investor Name</Label>
+                                            <Input type="text" name="investorName" value={formData.investorName} readOnly className="bg-zinc-50 dark:bg-[#1A1A1A] text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800" />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label>Account Number <span className="text-red-500">*</span></Label>
-                                            <Input type="text" name="accountNumber" required value={formData.accountNumber} onChange={handleChange} placeholder="Enter your account number" className="bg-white border-zinc-200" />
+                                            <Label className="text-zinc-900 dark:text-zinc-100">Account Number <span className="text-red-500">*</span></Label>
+                                            <Input type="text" pattern="[0-9]*" title="Please enter numbers only" name="accountNumber" required value={formData.accountNumber} onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (val === '' || /^[0-9\b]+$/.test(val)) {
+                                                    handleChange(e);
+                                                }
+                                            }} placeholder="Enter your account number" className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500" />
                                         </div>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>Request Title <span className="text-red-500">*</span></Label>
-                                        <Input type="text" name="title" required value={formData.title} onChange={handleChange} placeholder="Brief summary" className="bg-white border-zinc-200" />
+                                        <Label className="text-zinc-900 dark:text-zinc-100">Request Title <span className="text-red-500">*</span></Label>
+                                        <Input type="text" name="title" required value={formData.title} onChange={handleChange} placeholder="Brief summary" className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500" />
                                     </div>
 
                                     {currentConfig.requiredFields.length > 0 && (
                                         <div className="space-y-4 pt-2">
-                                            <h3 className="text-sm font-semibold text-zinc-900">{currentConfig.label} Details</h3>
+                                            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{currentConfig.label} Details</h3>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 {currentConfig.requiredFields.map(field => (
                                                     <div key={field.name} className="space-y-2">
-                                                        <Label>{field.label} {field.required && <span className="text-red-500">*</span>}</Label>
+                                                        <Label className="text-zinc-900 dark:text-zinc-100">{field.label} {field.required && <span className="text-red-500">*</span>}</Label>
                                                         <MetadataField field={field} value={serviceMetadata[field.name] || ''} onChange={handleMetadataChange} />
                                                     </div>
                                                 ))}
@@ -363,7 +384,7 @@ const CreateTicketFlow = ({ onTabChange }) => {
                                     )}
 
                                     <div className="space-y-2">
-                                        <Label>
+                                        <Label className="text-zinc-900 dark:text-zinc-100">
                                             {selectedType === 'COMPLAINT' ? 'Detailed Description' : 'Additional Notes'}
                                             {selectedType === 'COMPLAINT' && <span className="text-red-500 ml-1">*</span>}
                                         </Label>
@@ -374,32 +395,32 @@ const CreateTicketFlow = ({ onTabChange }) => {
                                             value={formData.description} 
                                             onChange={handleChange}
                                             placeholder="Provide any additional context..."
-                                            className="resize-none bg-white border-zinc-200" 
+                                            className="resize-none bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500" 
                                         />
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>
+                                        <Label className="text-zinc-900 dark:text-zinc-100">
                                             Supporting Document
                                             {currentConfig.requiredDocuments.length > 0 ? (
-                                                <span className="ml-2 text-[10px] bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded uppercase font-semibold tracking-wider">Required</span>
+                                                <span className="ml-2 text-[10px] bg-zinc-100 dark:bg-[#1A1A1A] text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded uppercase font-semibold tracking-wider">Required</span>
                                             ) : (
-                                                <span className="ml-2 text-[10px] bg-zinc-50 text-zinc-400 px-2 py-0.5 rounded uppercase font-medium tracking-wider border border-zinc-100">Optional</span>
+                                                <span className="ml-2 text-[10px] bg-zinc-50 dark:bg-[#1A1A1A] text-zinc-400 dark:text-zinc-500 px-2 py-0.5 rounded uppercase font-medium tracking-wider border border-zinc-100 dark:border-zinc-800">Optional</span>
                                             )}
                                         </Label>
                                         
                                         <div 
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="border-2 border-dashed border-zinc-200 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer bg-zinc-50 hover:bg-zinc-100 transition-colors"
+                                            className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer bg-zinc-50 dark:bg-[#1A1A1A]/50 hover:bg-zinc-100 dark:hover:bg-[#1A1A1A] transition-colors"
                                         >
                                             <input type="file" className="hidden" ref={fileInputRef} accept="image/jpeg,image/png,application/pdf" required={currentConfig.requiredDocuments.length > 0 && !file} onChange={e => setFile(e.target.files[0])} />
                                             {file ? (
                                                 <div className="text-center">
-                                                    <FileText className="w-8 h-8 text-zinc-900 mx-auto mb-2" />
-                                                    <p className="text-sm font-medium text-zinc-900">{file.name}</p>
+                                                    <FileText className="w-8 h-8 text-zinc-900 dark:text-zinc-100 mx-auto mb-2" />
+                                                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{file.name}</p>
                                                 </div>
                                             ) : (
-                                                <div className="text-center text-zinc-500">
+                                                <div className="text-center text-zinc-500 dark:text-zinc-400">
                                                     <UploadCloud className="w-8 h-8 mx-auto mb-2 opacity-50" />
                                                     <p className="text-sm font-medium">Click to upload or drag and drop</p>
                                                     <p className="text-xs opacity-70 mt-1">JPEG, PNG, PDF up to 5 MB</p>
@@ -424,23 +445,23 @@ const CreateTicketFlow = ({ onTabChange }) => {
 
                 {step === 3 && currentConfig && (
                     <motion.div key="step3" variants={variants} initial="initial" animate="animate" exit="exit" className="space-y-6">
-                        <Card className="border-zinc-200 shadow-sm bg-white overflow-hidden">
-                            <div className="bg-zinc-50 border-b border-zinc-100 px-6 py-4 flex items-center justify-between">
+                        <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-[#131313] overflow-hidden">
+                            <div className="bg-zinc-50 dark:bg-[#1A1A1A] border-b border-zinc-100 dark:border-zinc-800 px-6 py-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-white border border-zinc-200 text-zinc-900 flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#131313] border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 flex items-center justify-center">
                                         {React.createElement(currentConfig.icon, { className: "w-5 h-5" })}
                                     </div>
                                     <div>
-                                        <p className="text-sm font-semibold text-zinc-900">{currentConfig.label}</p>
-                                        <p className="text-xs text-zinc-500 mt-0.5">Review your submission</p>
+                                        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{currentConfig.label}</p>
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Review your submission</p>
                                     </div>
                                 </div>
                             </div>
                             
                             <CardContent className="p-6 space-y-6">
                                 <div>
-                                    <h4 className="text-xs font-semibold text-zinc-900 uppercase tracking-widest mb-3">Investor Details</h4>
-                                    <div className="bg-white rounded-lg border border-zinc-100 px-4">
+                                    <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-widest mb-3">Investor Details</h4>
+                                    <div className="bg-white dark:bg-[#131313] rounded-lg border border-zinc-100 dark:border-zinc-800 px-4">
                                         <ReviewRow label="Name" value={formData.investorName} />
                                         <ReviewRow label="Account" value={formData.accountNumber} />
                                         <ReviewRow label="Title" value={formData.title} />
@@ -449,8 +470,8 @@ const CreateTicketFlow = ({ onTabChange }) => {
 
                                 {currentConfig.requiredFields.length > 0 && Object.keys(serviceMetadata).length > 0 && (
                                     <div>
-                                        <h4 className="text-xs font-semibold text-zinc-900 uppercase tracking-widest mb-3">Service Details</h4>
-                                        <div className="bg-white rounded-lg border border-zinc-100 px-4">
+                                        <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-widest mb-3">Service Details</h4>
+                                        <div className="bg-white dark:bg-[#131313] rounded-lg border border-zinc-100 dark:border-zinc-800 px-4">
                                             {currentConfig.requiredFields.map(field => (
                                                 <ReviewRow key={field.name} label={field.label} value={serviceMetadata[field.name]} />
                                             ))}
@@ -460,18 +481,18 @@ const CreateTicketFlow = ({ onTabChange }) => {
 
                                 {formData.description && (
                                     <div>
-                                        <h4 className="text-xs font-semibold text-zinc-900 uppercase tracking-widest mb-3">Notes</h4>
-                                        <p className="text-sm text-zinc-600 bg-zinc-50 p-4 rounded-lg border border-zinc-100">
+                                        <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-widest mb-3">Notes</h4>
+                                        <p className="text-sm text-zinc-600 dark:text-zinc-300 bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-lg border border-zinc-100 dark:border-zinc-800">
                                             "{formData.description}"
                                         </p>
                                     </div>
                                 )}
 
-                                <div className={`flex items-center gap-3 p-4 rounded-lg border ${file ? 'bg-zinc-50 border-zinc-200' : 'bg-white border-dashed border-zinc-200'}`}>
-                                    {file ? <CheckCircle2 className="w-5 h-5 text-zinc-900 shrink-0" /> : <AlertCircle className="w-5 h-5 text-zinc-400 shrink-0" />}
+                                <div className={`flex items-center gap-3 p-4 rounded-lg border ${file ? 'bg-zinc-50 dark:bg-[#1A1A1A] border-zinc-200 dark:border-zinc-700' : 'bg-white dark:bg-[#131313] border-dashed border-zinc-200 dark:border-zinc-800'}`}>
+                                    {file ? <CheckCircle2 className="w-5 h-5 text-zinc-900 dark:text-zinc-100 shrink-0" /> : <AlertCircle className="w-5 h-5 text-zinc-400 shrink-0" />}
                                     <div>
-                                        <p className="text-sm font-medium text-zinc-900">{file ? file.name : 'No document attached'}</p>
-                                        <p className="text-xs text-zinc-500 mt-0.5">Document upload status</p>
+                                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{file ? file.name : 'No document attached'}</p>
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Document upload status</p>
                                     </div>
                                 </div>
                             </CardContent>

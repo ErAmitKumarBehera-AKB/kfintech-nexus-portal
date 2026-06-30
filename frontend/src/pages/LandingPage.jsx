@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import LandingNavbar from '../components/common/LandingNavbar';
 import Footer from '../components/common/Footer';
+import ThreeDMarqueeDemo from '../components/ThreeDMarqueeDemo';
 
 const LandingPage = () => {
     const { isAuthenticated, user, getRoleDefaultRoute } = useAuth();
@@ -92,6 +93,14 @@ const LandingPage = () => {
                     </motion.div>
 
                 </div>
+            </section>
+
+            {/* Showcase Marquee Section */}
+            <section className="relative w-full overflow-hidden pb-20 pt-10">
+                <div className="max-w-7xl mx-auto px-6 text-center mb-10">
+                    <p className="text-gray-500 font-medium tracking-widest text-sm uppercase">Trusted by modern financial teams</p>
+                </div>
+                <ThreeDMarqueeDemo />
             </section>
 
             {/* Features Section - Minimal/No Boxy Grid */}
