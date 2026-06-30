@@ -14,6 +14,7 @@ import L1MakerDesk from './pages/L1MakerDesk';
 import L2CheckerDesk from './pages/L2CheckerDesk';
 import AdminDashboard from './pages/AdminDashboard';
 import ProfilePage from './pages/ProfilePage';
+import ThreeDMarqueeDemo from './components/ThreeDMarqueeDemo';
 
 const AppRoutes = () => {
     const { user, isAuthenticated, isLoading } = useAuth();
@@ -21,8 +22,21 @@ const AppRoutes = () => {
 
     if (isLoading) {
         return (
-            <div>
-                <div></div>
+            <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white font-sans">
+                <div className="relative flex items-center justify-center mb-8">
+                    {/* Outer glowing ring */}
+                    <div className="absolute w-24 h-24 border-4 border-white/10 rounded-full animate-[spin_3s_linear_infinite]" />
+                    {/* Inner spinning ring */}
+                    <div className="absolute w-16 h-16 border-4 border-t-white border-r-transparent border-b-transparent border-l-transparent rounded-full animate-[spin_1s_cubic-bezier(0.5,0,0.5,1)_infinite]" />
+                    {/* Center Dot */}
+                    <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+                </div>
+                
+                <h2 className="text-xl font-medium tracking-tight mb-2">FinnovaX</h2>
+                <p className="text-sm text-zinc-500 max-w-xs text-center animate-pulse">
+                    Establishing secure connection...<br/>
+                    <span className="text-xs mt-2 block opacity-70">(Booting up servers, this may take up to 50 seconds on first load)</span>
+                </p>
             </div>
         );
     }
@@ -140,12 +154,18 @@ const AppRoutes = () => {
     );
 };
 
+import { ThemeProvider } from './context/ThemeContext';
+import { Toaster } from "@/components/ui/sonner";
+
 function App() {
     return (
         <BrowserRouter>
-            <AuthProvider>
-                <AppRoutes />
-            </AuthProvider>
+            <ThemeProvider>
+                <AuthProvider>
+                    <AppRoutes />
+                    <Toaster position="top-center" />
+                </AuthProvider>
+            </ThemeProvider>
         </BrowserRouter>
     );
 }
