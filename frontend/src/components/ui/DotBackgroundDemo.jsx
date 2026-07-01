@@ -14,7 +14,7 @@ export default function DotBackgroundDemo() {
       />
 
       {/* Fade */}
-      <div className="absolute inset-0 z-0 pointer-events-none bg-zinc-50 dark:bg-black [mask-image:radial-gradient(circle_at_center,transparent_20%,black)]" />
+      <div className="absolute inset-0 z-0 pointer-events-none bg-[#faf9f6] dark:bg-zinc-950 [mask-image:radial-gradient(circle_at_center,transparent_20%,black)]" />
     </>
   );
 }
