@@ -57,7 +57,23 @@ exports.createTicket = async (req, res) => {
             }
         }
 
-        const uploadedDocuments = await documentService.uploadDocuments(files);
+        let uploadedDocuments = await documentService.uploadDocuments(files);
+        
+        if (req.body.existingDocuments) {
+            try {
+                const existingDocs = JSON.parse(req.body.existingDocuments);
+                uploadedDocuments = [...uploadedDocuments, ...existingDocs.map(d => ({
+                    name: d.name || 'Vault Document',
+                    fileType: d.fileType || 'application/pdf',
+                    size: d.size || 0,
+                    s3Key: d.url || d.s3Key,
+                    status: 'PENDING',
+                    ocrExtraction: { extractedText: null, matchVerified: false }
+                }))];
+            } catch (e) {
+                console.error('Failed to parse existingDocuments:', e);
+            }
+        }
         
         const slaConfig = workflowService.calculateSla(serviceType);
         
@@ -69,7 +85,7 @@ exports.createTicket = async (req, res) => {
             description: finalDescription,
             documents: uploadedDocuments,
             aiSentimentScore: aiPayload.score || 0,
-            assignedPriority: aiPayload.priority || 'NORMAL',
+            assignedPriority: 'NORMAL', // L1 agent sets priority — AI only scores
             aiSummary,
             isPotentialFraud: aiPayload.fraud_alert || false,
             serviceType: serviceType || 'COMPLAINT',
@@ -96,9 +112,13 @@ exports.createTicket = async (req, res) => {
             userId: investorId,
             ticketId: newTicket._id,
             type: 'TICKET_CREATED',
-            title: 'Ticket Created',
-            message: `Your ticket has been successfully submitted and is under review.`,
-            channels: { inApp: true, email: true }
+            title: 'Service Request Received',
+            message: `Your ticket "${newTicket.title}" has been successfully submitted and is under review.`,
+            channels: { inApp: true, email: true },
+            meta: {
+                ticketTitle: newTicket.title,
+                shortId: newTicket._id.toString().slice(-8).toUpperCase()
+            }
         }, { session });
 
         await session.commitTransaction();

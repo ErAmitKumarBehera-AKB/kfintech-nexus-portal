@@ -45,7 +45,7 @@ const TicketSchema = new mongoose.Schema({
     },
     assignedPriority: {
         type: String,
-        enum: ['NORMAL', 'CRITICAL'],
+        enum: ['NORMAL', 'HIGH', 'CRITICAL'],
         default: 'NORMAL'
     },
     aiSummary: {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Activity, Eye, EyeOff, ArrowLeft } from 'lucide-react';
@@ -53,7 +53,16 @@ const LoginPage = () => {
             toast.success(location.state.message);
             navigate(location.pathname, { replace: true, state: {} });
         }
-    }, [location, navigate]);
+    }, []);
+
+    // Shake password on error
+    const [shakePassword, setShakePassword] = useState(false);
+    const shakeTimeoutRef = useRef(null);
+    const triggerShake = () => {
+        setShakePassword(true);
+        clearTimeout(shakeTimeoutRef.current);
+        shakeTimeoutRef.current = setTimeout(() => setShakePassword(false), 600);
+    };
 
     const handleLoginSubmit = async (e) => {
         e.preventDefault();
@@ -81,6 +90,7 @@ const LoginPage = () => {
             const msg = err.response?.data?.message || 'Login failed. Please check your credentials.';
             setError(msg);
             setSuccessMessage('');
+            triggerShake();
         } finally {
             setIsLoading(false);
         }
@@ -209,9 +219,9 @@ const LoginPage = () => {
                                             type={showPassword ? 'text' : 'password'}
                                             autoComplete="current-password"
                                             value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
+                                            onChange={(e) => { setPassword(e.target.value); if (error) setError(''); }}
                                             placeholder="••••••••••"
-                                            className="bg-white/50 dark:bg-black/50 border-zinc-200 dark:border-zinc-800 focus-visible:ring-kfintech-primary text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 transition-all pr-10"
+                                            className={`bg-white/50 dark:bg-black/50 border-zinc-200 dark:border-zinc-800 focus-visible:ring-kfintech-primary text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 transition-all pr-10 ${shakePassword ? 'animate-shake border-red-400 dark:border-red-500' : ''}`}
                                         />
                                         <Button 
                                             variant="ghost"

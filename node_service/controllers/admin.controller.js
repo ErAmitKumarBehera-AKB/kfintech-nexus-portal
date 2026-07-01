@@ -348,25 +348,97 @@ exports.updateUserStatus = async (req, res) => {
 
 exports.getAgentActivities = async (req, res) => {
     try {
-        const page  = parseInt(req.query.page)  || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const page     = parseInt(req.query.page)    || 1;
+        const limit    = parseInt(req.query.limit)   || 20;
+        const agentId  = req.query.agentId; // Optional: filter by specific agent
 
-        const adminUsers = await User.find({ role: { $in: ['ADMIN_L1', 'ADMIN_L2'] } }).select('_id');
-        const adminIds   = adminUsers.map(u => u._id);
+        // Build the query — either filter by a specific agent or all L1/L2 admins
+        let performedByQuery;
+        if (agentId && agentId !== 'ALL') {
+            performedByQuery = { performedBy: agentId };
+        } else {
+            const adminUsers = await User.find({ role: { $in: ['ADMIN_L1', 'ADMIN_L2'] } }).select('_id');
+            performedByQuery = { performedBy: { $in: adminUsers.map(u => u._id) } };
+        }
 
-        const logs = await AuditLog.find({ performedBy: { $in: adminIds } })
+        const logs = await AuditLog.find(performedByQuery)
             .populate('performedBy', 'name role email')
-            .populate('entityId', 'ticketId serviceType')
+            .populate('entityId', 'title serviceType')
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(limit);
 
-        const total = await AuditLog.countDocuments({ performedBy: { $in: adminIds } });
+        const total = await AuditLog.countDocuments(performedByQuery);
 
         return res.status(200).json({
             activities: logs,
             pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
         });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+};
+
+/**
+ * GET /api/admin/agents
+ * Returns list of all L1/L2 agents for the agent selector dropdown
+ */
+exports.getAgentList = async (req, res) => {
+    try {
+        const agents = await User.find({ role: { $in: ['ADMIN_L1', 'ADMIN_L2'] } })
+            .select('name role email isActive createdAt')
+            .sort({ name: 1 });
+        return res.status(200).json({ agents });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+};
+
+/**
+ * GET /api/admin/agents/activities/export
+ * Downloads CSV of agent activities.
+ * ?agentId=<id> — for a specific agent
+ * ?agentId=ALL  — for all agents
+ */
+exports.exportAgentActivities = async (req, res) => {
+    try {
+        const agentId = req.query.agentId;
+
+        let performedByQuery;
+        let agentName = 'All Agents';
+
+        if (agentId && agentId !== 'ALL') {
+            const agent = await User.findById(agentId).select('name role');
+            agentName = agent ? `${agent.name} (${agent.role})` : agentId;
+            performedByQuery = { performedBy: agentId };
+        } else {
+            const adminUsers = await User.find({ role: { $in: ['ADMIN_L1', 'ADMIN_L2'] } }).select('_id');
+            performedByQuery = { performedBy: { $in: adminUsers.map(u => u._id) } };
+        }
+
+        const logs = await AuditLog.find(performedByQuery)
+            .populate('performedBy', 'name role email')
+            .populate('entityId', 'title serviceType')
+            .sort({ createdAt: -1 });
+
+        let csv = 'Agent Name,Agent Role,Agent Email,Action,Ticket/Entity,Created At\n';
+        logs.forEach(log => {
+            const agentNameVal  = `"${(log.performedBy?.name  || '').replace(/"/g, '""')}"`;
+            const agentRole     = log.performedBy?.role  || '';
+            const agentEmail    = log.performedBy?.email || '';
+            const action        = log.action || '';
+            const entity        = `"${(log.entityId?.title || log.entityId?.serviceType || log.entityId?._id || '').toString().replace(/"/g, '""')}"`;
+            const createdAt     = log.createdAt ? log.createdAt.toISOString() : '';
+            csv += `${agentNameVal},${agentRole},${agentEmail},${action},${entity},${createdAt}\n`;
+        });
+
+        const filename = agentId && agentId !== 'ALL'
+            ? `agent_activities_${agentName.replace(/[^a-z0-9]/gi, '_')}.csv`
+            : 'agent_activities_all.csv';
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.status(200).send(csv);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

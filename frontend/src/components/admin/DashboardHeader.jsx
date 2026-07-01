@@ -11,7 +11,7 @@ const DashboardHeader = () => {
                         <div className="h-8 w-8 bg-zinc-900 dark:bg-zinc-100 rounded flex items-center justify-center shadow-sm border border-zinc-800 dark:border-zinc-200">
                             <ShieldCheck className="h-5 w-5 text-amber-500 dark:text-zinc-900" />
                         </div>
-                        <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Nexus</h1>
+                        <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">FinnovaX</h1>
                     </div>
 
                     <div className="hidden md:flex items-center text-sm font-bold text-zinc-500 dark:text-zinc-400">

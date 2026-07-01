@@ -105,31 +105,34 @@ const AppSidebar = ({ activeTab, onTabChange }) => {
     const strokeDashoffset = circumference - (progress / 100) * circumference;
 
     const AvatarWithRing = () => (
-      <div className="relative inline-flex items-center justify-center shrink-0">
-        <svg className="absolute -inset-1 w-10 h-10 -rotate-90">
+      <div className="relative inline-flex items-center justify-center shrink-0 w-9 h-9">
+        <svg
+          className="absolute inset-0 w-9 h-9 -rotate-90 pointer-events-none"
+          viewBox="0 0 36 36"
+        >
           <circle
-            cx="20"
-            cy="20"
-            r={radius}
-            className="stroke-zinc-200 dark:stroke-zinc-800"
-            strokeWidth="2"
+            cx="18"
+            cy="18"
+            r="16"
+            className="stroke-zinc-200 dark:stroke-zinc-700"
+            strokeWidth="2.5"
             fill="transparent"
           />
           <circle
-            cx="20"
-            cy="20"
-            r={radius}
-            className={progress === 100 ? "stroke-emerald-500" : "stroke-yellow-400"}
-            strokeWidth="2"
+            cx="18"
+            cy="18"
+            r="16"
+            className={progress === 100 ? "stroke-emerald-500 dark:stroke-emerald-400" : "stroke-amber-400 dark:stroke-amber-400"}
+            strokeWidth="2.5"
             fill="transparent"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
+            strokeDasharray={2 * Math.PI * 16}
+            strokeDashoffset={2 * Math.PI * 16 - (progress / 100) * 2 * Math.PI * 16}
             strokeLinecap="round"
-            style={{ transition: 'stroke-dashoffset 0.5s ease, stroke 0.5s ease' }}
+            style={{ transition: 'stroke-dashoffset 0.6s ease, stroke 0.5s ease' }}
           />
         </svg>
-        <Avatar className="h-8 w-8 rounded-full">
-          <AvatarFallback className="rounded-full bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 font-medium">{initials}</AvatarFallback>
+        <Avatar className="h-7 w-7 rounded-full">
+          <AvatarFallback className="rounded-full bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-xs font-semibold border border-zinc-200 dark:border-zinc-700">{initials}</AvatarFallback>
         </Avatar>
       </div>
     );
@@ -144,7 +147,7 @@ const AppSidebar = ({ activeTab, onTabChange }) => {
                   <GalleryVerticalEnd className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight text-zinc-900 dark:text-zinc-100">
-                  <span className="truncate font-semibold">Nexus Portal</span>
+                  <span className="truncate font-semibold">FinnovaX</span>
                   <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">Investor Hub</span>
                 </div>
               </SidebarMenuButton>

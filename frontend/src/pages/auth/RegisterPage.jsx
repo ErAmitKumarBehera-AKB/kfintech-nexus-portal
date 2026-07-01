@@ -18,9 +18,12 @@ import { toast } from "sonner";
 const formSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email address'),
-  phoneNumber: z.string().optional().refine(val => !val || /^\d{10}$/.test(val), {
-    message: 'Phone number must be exactly 10 digits'
-  }),
+  phoneNumber: z.string()
+    .min(10, 'Phone number must be exactly 10 digits')
+    .max(10, 'Phone number must be exactly 10 digits')
+    .refine(val => /^\d{10}$/.test(val), {
+      message: 'Phone number must be exactly 10 digits'
+    }),
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .refine(val => /[a-zA-Z]/.test(val),
@@ -163,10 +166,10 @@ const RegisterPage = () => {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="phoneNumber" className="text-zinc-700 dark:text-zinc-300 font-medium">Phone Number <span className="text-zinc-400 dark:text-zinc-500 font-normal">(Optional)</span></Label>
+                <Label htmlFor="phoneNumber" className="text-zinc-700 dark:text-zinc-300 font-medium">Phone Number</Label>
                 <div className="flex gap-2">
-                  <div className="flex items-center justify-center w-[50px] border border-zinc-200 dark:border-zinc-800 rounded-md bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-500 dark:text-zinc-400 font-medium cursor-not-allowed select-none transition-colors">
-                    +91
+                  <div className="flex items-center justify-center px-3 border border-zinc-200 dark:border-zinc-800 rounded-md bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-500 dark:text-zinc-400 font-medium cursor-not-allowed select-none transition-colors whitespace-nowrap">
+                    🇮🇳 +91
                   </div>
                   <Input
                     id="phoneNumber"
@@ -280,10 +283,10 @@ const RegisterPage = () => {
                     htmlFor="terms"
                     className="text-xs text-zinc-500 dark:text-zinc-400 leading-tight"
                   >
-                    By clicking continue, you agree to our{' '}
-                    <a href="#" className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100">Terms of Service</a>
+                    I agree to the{' '}
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100">Terms of Service</a>
                     {' '}and{' '}
-                    <a href="#" className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100">Privacy Policy</a>.
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100">Privacy Policy</a>.
                   </label>
                 </div>
                 {form.formState.errors.agreeTerms && (

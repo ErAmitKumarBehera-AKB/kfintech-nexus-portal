@@ -26,4 +26,8 @@ router.post('/tickets/:id/reject', authenticate, authorize('ADMIN_L1', 'ADMIN_SU
 // Generate AI summary for the ticket
 router.post('/tickets/:id/summarize', authenticate, authorize('ADMIN_L1', 'ADMIN_SUPER'), l1Controller.summarizeTicket);
 
+// Route: PATCH /api/l1/tickets/:id/priority
+// L1 Maker manually sets ticket priority (NORMAL | HIGH | CRITICAL)
+router.patch('/tickets/:id/priority', authenticate, authorize('ADMIN_L1', 'ADMIN_SUPER'), l1Controller.setPriority);
+
 module.exports = router;

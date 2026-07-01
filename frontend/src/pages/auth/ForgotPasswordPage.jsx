@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PasswordRequirementsPopup, PasswordMatchPopup } from "@/components/common/PasswordPopups";
 import ThemeToggle from '../../components/common/ThemeToggle';
 import DotBackgroundDemo from "@/components/ui/DotBackgroundDemo";
+import { toast } from "sonner";
 
 const ForgotPasswordPage = () => {
     const location = useLocation();
@@ -21,7 +22,6 @@ const ForgotPasswordPage = () => {
     const [timeLeft, setTimeLeft] = useState(30);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
-    const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
         let timer;
@@ -50,7 +50,7 @@ const ForgotPasswordPage = () => {
 
         try {
             await authApi.forgotPassword(email.trim().toLowerCase());
-            setSuccessMessage('An OTP has been sent to your email.');
+            toast.success('An OTP has been sent to your email.');
             setTimeLeft(30);
             setIsOtpStep(true);
         } catch (err) {
@@ -66,7 +66,7 @@ const ForgotPasswordPage = () => {
         setSuccessMessage('');
         try {
             await authApi.forgotPassword(email.trim().toLowerCase());
-            setSuccessMessage('A new OTP has been sent to your email.');
+            toast.success('A new OTP has been sent to your email.');
             setTimeLeft(30);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to resend OTP.');
@@ -89,11 +89,11 @@ const ForgotPasswordPage = () => {
 
         setIsLoading(true);
         setError('');
-        setSuccessMessage('');
 
         try {
             await authApi.resetPassword(email.trim().toLowerCase(), otp, password);
-            navigate('/login', { replace: true, state: { message: 'Password successfully reset! Please login with your new password.' } });
+            toast.success('Password successfully reset! Please login with your new password.');
+            navigate('/login', { replace: true });
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to reset password. OTP may be invalid.');
         } finally {
@@ -134,11 +134,6 @@ const ForgotPasswordPage = () => {
                         {error && (
                             <div className="mb-4 p-3 rounded-md bg-red-50 text-red-600 text-sm font-medium text-center border border-red-100">
                                 {error}
-                            </div>
-                        )}
-                        {successMessage && (
-                            <div className="mb-4 p-3 rounded-md bg-green-50 text-green-700 text-sm font-medium text-center border border-green-100">
-                                {successMessage}
                             </div>
                         )}
 

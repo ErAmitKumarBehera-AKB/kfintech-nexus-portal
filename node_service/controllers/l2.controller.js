@@ -164,24 +164,46 @@ exports.finalizeTicket = async (req, res) => {
             }
         });
 
-        // Step 6: Send notifications (non-blocking — don't fail the response)
-        try {
-            const investor = ticket.investorId;
-            const notificationType = action === 'APPROVE' ? 'TICKET_RESOLVED'
-                                   : action === 'REJECT' ? 'TICKET_REJECTED'
-                                   : 'RETURNED_TO_L1';
+        // Step 6: Send notifications (non-blocking — never fails the response)
+        setImmediate(async () => {
+            try {
+                const investorUser = ticket.investorId;
+                const shortId = ticket._id.toString().slice(-8).toUpperCase();
 
-            await notificationService.createNotification({
-                userId: investor?._id || ticket.investorId,
-                ticketId: ticket._id,
-                type: notificationType,
-                title: action === 'APPROVE' ? 'Ticket Resolved' : action === 'REJECT' ? 'Ticket Rejected' : 'Ticket Update',
-                message: `Your ticket has been ${action === 'APPROVE' ? 'approved and resolved' : action === 'REJECT' ? 'rejected' : 'returned to L1 for rework'} by our review team.`,
-                channels: { inApp: true, email: true }
-            });
-        } catch (notifErr) {
-            console.error('[L2] Non-critical notification error:', notifErr.message);
-        }
+                let notifType, notifTitle, notifMessage;
+
+                if (action === 'APPROVE') {
+                    notifType = 'TICKET_RESOLVED';
+                    notifTitle = 'Your Request Has Been Resolved';
+                    notifMessage = `Your ticket "${ticket.title}" has been reviewed and approved by our ${performedByRole || 'L2 Checker'}.`;
+                } else if (action === 'REJECT') {
+                    notifType = 'TICKET_REJECTED';
+                    notifTitle = 'Action Required: Request Rejected';
+                    notifMessage = `Your ticket "${ticket.title}" has been reviewed and requires revision.`;
+                } else {
+                    notifType = 'STATUS_CHANGED';
+                    notifTitle = 'Ticket Under Further Review';
+                    notifMessage = `Your ticket "${ticket.title}" has been returned to our L1 team for additional verification.`;
+                }
+
+                await notificationService.createNotification({
+                    userId: investorUser?._id || ticket.investorId,
+                    ticketId: ticket._id,
+                    type: notifType,
+                    title: notifTitle,
+                    message: notifMessage,
+                    channels: { inApp: true, email: true },
+                    meta: {
+                        ticketTitle: ticket.title,
+                        shortId,
+                        rejectionReason: (action !== 'APPROVE' && notes) ? notes : undefined,
+                        performedByRole: 'L2 Checker'
+                    }
+                });
+            } catch (notifErr) {
+                console.error('[L2] Non-critical notification error:', notifErr.message);
+            }
+        });
 
         return res.status(200).json({
             message: `Ticket successfully ${action.toLowerCase()}d. Status: ${previousStatus} → ${newStatus}.`,

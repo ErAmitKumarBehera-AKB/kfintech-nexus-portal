@@ -158,9 +158,14 @@ exports.escalateTicket = async (req, res) => {
                 userId: ticket.investorId,
                 ticketId: ticket._id,
                 type: 'STATUS_CHANGED',
-                title: 'Ticket Escalated',
-                message: `Your ticket has been verified and moved to L2 Review.`,
-                channels: { inApp: true, email: true }
+                title: 'Ticket Under Senior Review',
+                message: `Your ticket "${ticket.title}" has been verified and escalated to our senior review team (L2). You will be notified once a final decision is made.`,
+                channels: { inApp: true, email: true },
+                meta: {
+                    ticketTitle: ticket.title,
+                    shortId: ticket._id.toString().slice(-8).toUpperCase(),
+                    performedByRole: 'L1 Maker'
+                }
             }, { session });
 
             await session.commitTransaction();
@@ -219,10 +224,16 @@ exports.rejectTicket = async (req, res) => {
             await notificationService.createNotification({
                 userId: ticket.investorId,
                 ticketId: ticket._id,
-                type: 'DOCUMENT_REJECTED',
-                title: 'Action Required: Revision Needed',
-                message: `L1 Admin: ${reason}`,
-                channels: { inApp: true, email: true }
+                type: 'TICKET_REJECTED',
+                title: 'Action Required: Request Rejected',
+                message: `Your ticket "${ticket.title}" has been reviewed and requires revision.`,
+                channels: { inApp: true, email: true },
+                meta: {
+                    ticketTitle: ticket.title,
+                    shortId: ticket._id.toString().slice(-8).toUpperCase(),
+                    rejectionReason: reason,
+                    performedByRole: 'L1 Maker'
+                }
             }, { session });
 
             await session.commitTransaction();
@@ -264,5 +275,51 @@ exports.summarizeTicket = async (req, res) => {
     } catch (error) {
         console.error("Summarizer proxy error:", error);
         res.status(500).json({ message: "Failed to generate summary from AI engine" });
+    }
+};
+
+/**
+ * PATCH /api/l1/tickets/:id/priority
+ * L1 Maker manually sets or overrides ticket priority.
+ * Valid values: NORMAL | HIGH | CRITICAL
+ */
+exports.setPriority = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { priority } = req.body;
+
+        const VALID_PRIORITIES = ['NORMAL', 'HIGH', 'CRITICAL'];
+        if (!priority || !VALID_PRIORITIES.includes(priority)) {
+            return res.status(400).json({
+                message: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}`
+            });
+        }
+
+        const ticket = await Ticket.findById(id);
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        const previousPriority = ticket.assignedPriority;
+        ticket.assignedPriority = priority;
+        await ticket.save();
+
+        await AuditLog.create({
+            entityId: ticket._id,
+            entityType: 'Ticket',
+            action: 'PRIORITY_SET',
+            performedBy: req.user.id,
+            details: {
+                before: { assignedPriority: previousPriority },
+                after: { assignedPriority: priority },
+                note: `L1 Maker manually set priority to ${priority}.`
+            }
+        });
+
+        return res.status(200).json({
+            message: `Priority updated to ${priority}.`,
+            ticket
+        });
+    } catch (error) {
+        console.error('[L1] setPriority error:', error);
+        return res.status(500).json({ message: 'Failed to update priority.' });
     }
 };

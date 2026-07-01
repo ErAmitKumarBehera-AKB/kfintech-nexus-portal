@@ -4,12 +4,11 @@ import { Button } from "@/components/ui/button";
 import { FileText, Trash2, Eye, ShieldCheck, UploadCloud, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import apiClient from '../../api/client';
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 
 const Documents = () => {
     const { user, updateSession } = useAuth();
     const [loading, setLoading] = useState(null);
-    const [message, setMessage] = useState({ type: '', text: '' });
 
     const kycDocs = user?.kyc || {};
 
@@ -42,7 +41,6 @@ const Documents = () => {
         if (!file) return;
 
         setLoading(docId);
-        setMessage({ type: '', text: '' });
         
         try {
             const formData = new FormData();
@@ -62,7 +60,7 @@ const Documents = () => {
                 }
             }
             
-            setMessage({ type: 'success', text: messageText });
+            toast.success(messageText);
             if (res.data.user) {
                 if (typeof updateSession === 'function') {
                     updateSession(res.data.user);
@@ -71,7 +69,7 @@ const Documents = () => {
                 }
             }
         } catch (error) {
-            setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to upload document' });
+            toast.error(error.response?.data?.message || 'Failed to upload document');
         } finally {
             setLoading(null);
             e.target.value = null; // reset input
@@ -82,11 +80,10 @@ const Documents = () => {
         if (!window.confirm("Are you sure you want to delete this document?")) return;
         
         setLoading(docId);
-        setMessage({ type: '', text: '' });
         
         try {
             const res = await apiClient.delete(`/auth/profile/documents/${docId}`);
-            setMessage({ type: 'success', text: res.data.message || 'Document deleted successfully!' });
+            toast.success(res.data.message || 'Document deleted successfully!');
             if (res.data.user) {
                 if (typeof updateSession === 'function') {
                     updateSession(res.data.user);
@@ -95,7 +92,7 @@ const Documents = () => {
                 }
             }
         } catch (error) {
-            setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to delete document' });
+            toast.error(error.response?.data?.message || 'Failed to delete document');
         } finally {
             setLoading(null);
         }
@@ -108,12 +105,7 @@ const Documents = () => {
                 <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Manage your KYC documents and identity proofs.</p>
             </div>
 
-            {message.text && (
-                <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className={message.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : ''}>
-                    {message.type === 'error' ? <AlertCircle className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
-                    <AlertDescription className="ml-2">{message.text}</AlertDescription>
-                </Alert>
-            )}
+
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {docsConfig.map(doc => (

@@ -100,8 +100,8 @@ const SLAProgressBar = ({ currentStatus, timeline = [] }) => {
     };
 
     return (
-        <div className="w-full py-4 overflow-x-auto custom-scrollbar">
-            <div className="relative flex justify-between items-center w-full min-w-[500px] px-8">
+        <div className="w-full py-4">
+            <div className="relative flex justify-between items-center w-full px-8">
                 {/* Background Track */}
                 <div className="absolute left-8 right-8 top-1/2 h-1 -translate-y-1/2 bg-zinc-100 dark:bg-zinc-800 rounded-full" />
                 
@@ -148,7 +148,7 @@ const SLAProgressBar = ({ currentStatus, timeline = [] }) => {
                                     {step.label}
                                 </p>
                                 {dateReached && (
-                                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 whitespace-nowrap">
                                         {format(new Date(dateReached), 'MMM dd, HH:mm')}
                                     </p>
                                 )}

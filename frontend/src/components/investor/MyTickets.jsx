@@ -119,11 +119,6 @@ const MyTickets = ({ onSelectTicket }) => {
                                         <Badge variant="secondary" className={getStatusColor(ticket.status)}>
                                             {ticket.status.replace('_', ' ')}
                                         </Badge>
-                                        {ticket.assignedPriority && (
-                                            <Badge variant="outline" className="text-xs text-zinc-600 dark:text-zinc-300 bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-700">
-                                                {ticket.assignedPriority}
-                                            </Badge>
-                                        )}
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 transition-colors">{ticket.title || ticket.serviceType}</h3>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import apiClient from '../api/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, XCircle, CheckCircle, Cpu, AlertTriangle, ChevronLeft, FileText, User, Hash, RefreshCcw, Search, Clock, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, XCircle, CheckCircle, Cpu, AlertTriangle, ChevronLeft, FileText, User, Hash, RefreshCcw, Search, Clock, ShieldAlert, CheckCircle2, Copy, Check } from 'lucide-react';
 import { getServiceType } from '../config/serviceTypes';
 import { format } from 'date-fns';
 
@@ -37,8 +37,11 @@ const ServiceTypeBadge = ({ serviceType }) => {
 
 const stripPrefix = (text) => (text || '').replace(/^\[[A-Z_]+\]\s*/, '');
 
-const calculateSLA = (dateString, priority) => {
+const calculateSLA = (dateString, priority, status) => {
     if (!dateString) return <span className="text-zinc-400 dark:text-zinc-500 font-medium flex items-center gap-1">N/A</span>;
+    if (['CLOSED', 'RESOLVED', 'REJECTED'].includes(status)) {
+        return <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1"><Check className="w-3 h-3" /> SLA Met</span>;
+    }
 
     let slaHours = 24;
     if (priority === 'CRITICAL') slaHours = 2;
@@ -72,10 +75,14 @@ const L2CheckerDesk = () => {
 
     // Filtering State
     const [filterServiceType, setFilterServiceType] = useState('ALL');
+    const [filterPriority, setFilterPriority] = useState('ALL');
     const [filterSearch, setFilterSearch] = useState('');
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    
+    const [copiedId, setCopiedId] = useState(false);
+    const [isActionLoading, setIsActionLoading] = useState(null); // 'APPROVE', 'REJECT', 'RETURN_TO_L1'
 
     const fetchQueue = useCallback(async (manual = false) => {
         if (manual) setIsRefreshing(true);
@@ -86,6 +93,7 @@ const L2CheckerDesk = () => {
             const response = await apiClient.get(`/l2/tickets?_t=${new Date().getTime()}`, {
                 params: {
                     serviceType: filterServiceType,
+                    priority: filterPriority,
                     search: filterSearch,
                     page
                 }
@@ -99,7 +107,7 @@ const L2CheckerDesk = () => {
             setLoading(false);
             setIsRefreshing(false);
         }
-    }, [filterServiceType, filterSearch, page]);
+    }, [filterServiceType, filterPriority, filterSearch, page]);
 
     useEffect(() => {
         fetchQueue();
@@ -117,6 +125,7 @@ const L2CheckerDesk = () => {
             return;
         }
 
+        setIsActionLoading(action);
         try {
             await apiClient.post('/l2/finalize', {
                 ticketId: selectedTicket._id,
@@ -128,14 +137,16 @@ const L2CheckerDesk = () => {
             setNotes('');
         } catch (err) {
             alert(`Failed to execute ${action}. ${err.response?.data?.message || err.message}`);
+        } finally {
+            setIsActionLoading(null);
         }
     };
 
     if (loading && queue.length === 0 && !selectedTicket) {
         return (
-            <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-[#faf7f2] dark:bg-[#0f0f12]">
+            <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-[#faf9f6] dark:bg-zinc-950">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-200 dark:border-zinc-800 border-t-amber-600 dark:border-t-zinc-400" />
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 dark:border-zinc-800 border-t-zinc-800 dark:border-t-zinc-300" />
                     <span className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 animate-pulse">Loading L2 Workspace...</span>
                 </div>
             </div>
@@ -143,10 +154,10 @@ const L2CheckerDesk = () => {
     }
 
     return (
-        <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] overflow-hidden bg-[#faf7f2] dark:bg-[#0f0f12]">
+        <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] overflow-hidden bg-[#faf9f6] dark:bg-[#0A0A0A]">
             {/* Left Sidebar: Queue */}
-            <aside className={`w-full md:w-[320px] shrink-0 border-r border-amber-200/60 dark:border-zinc-800/80 bg-white/40 dark:bg-zinc-950/40 backdrop-blur-md flex flex-col shadow-sm z-10 ${selectedTicket ? 'hidden md:flex' : 'flex'}`}>
-                <div className="p-4 border-b border-amber-200/60 dark:border-zinc-800/80 bg-white/50 dark:bg-zinc-900/50 flex flex-col">
+            <aside className={`w-full md:w-[320px] shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#131313] flex flex-col shadow-sm z-10 ${selectedTicket ? 'hidden md:flex' : 'flex'}`}>
+                <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#131313] flex flex-col">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-base font-bold flex items-center gap-2 text-zinc-900 dark:text-zinc-100 tracking-tight">
                             <ShieldCheck className="h-5 w-5 text-amber-600 dark:text-amber-500" />
@@ -170,20 +181,31 @@ const L2CheckerDesk = () => {
                             <Input
                                 type="text" placeholder="Search reference..."
                                 value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
-                                className="pl-8 h-8 text-xs bg-white/70 dark:bg-zinc-900/70 border-amber-200/70 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus-visible:ring-1 focus-visible:ring-amber-300 dark:focus-visible:ring-zinc-700 shadow-sm rounded-md transition-colors"
+                                className="pl-8 h-8 text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus-visible:ring-1 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-600 shadow-sm rounded-md transition-colors"
                             />
                         </div>
                         <Select value={filterServiceType} onValueChange={setFilterServiceType}>
-                            <SelectTrigger className="h-8 text-xs bg-white/70 dark:bg-zinc-900/70 border-amber-200/70 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus:ring-1 focus:ring-amber-300 dark:focus:ring-zinc-700 shadow-sm rounded-md">
+                            <SelectTrigger className="h-8 text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm rounded-md">
                                 <SelectValue placeholder="All Services" />
                             </SelectTrigger>
-                            <SelectContent className="bg-white dark:bg-zinc-900 border-amber-200/70 dark:border-zinc-800 shadow-lg rounded-md">
+                            <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 shadow-lg rounded-md">
                                 <SelectItem value="ALL" className="text-xs font-medium">All Services</SelectItem>
                                 <SelectItem value="BANK_UPDATE" className="text-xs font-medium">Bank Update</SelectItem>
                                 <SelectItem value="KYC_UPDATE" className="text-xs font-medium">KYC Update</SelectItem>
                                 <SelectItem value="NOMINEE_UPDATE" className="text-xs font-medium">Nominee Update</SelectItem>
                                 <SelectItem value="ADDRESS_UPDATE" className="text-xs font-medium">Address Update</SelectItem>
                                 <SelectItem value="COMPLAINT" className="text-xs font-medium">Complaint</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={filterPriority} onValueChange={setFilterPriority}>
+                            <SelectTrigger className="h-8 text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm rounded-md">
+                                <SelectValue placeholder="All Priorities" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 shadow-lg rounded-md">
+                                <SelectItem value="ALL" className="text-xs font-medium">All Priorities</SelectItem>
+                                <SelectItem value="NORMAL" className="text-xs font-medium text-blue-600 dark:text-blue-400">Normal</SelectItem>
+                                <SelectItem value="HIGH" className="text-xs font-medium text-amber-600 dark:text-amber-400">High</SelectItem>
+                                <SelectItem value="CRITICAL" className="text-xs font-medium text-red-600 dark:text-red-400">Critical</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -233,8 +255,8 @@ const L2CheckerDesk = () => {
                                             className={`
                                                 relative overflow-hidden p-3 cursor-pointer transition-all duration-200 rounded-xl border 
                                                 ${selectedTicket?._id === ticket._id 
-                                                    ? 'bg-white border-amber-300 shadow-[0_4px_16px_rgba(120,80,30,0.08)] dark:bg-zinc-800 dark:border-zinc-600' 
-                                                    : 'bg-white/60 border-amber-200/60 hover:bg-white hover:border-amber-300 dark:bg-zinc-900/60 dark:border-zinc-800 hover:dark:bg-zinc-800/80 hover:dark:border-zinc-700'}
+                                                    ? 'bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 shadow-md' 
+                                                    : 'bg-white/60 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 hover:border-zinc-300 dark:hover:bg-zinc-800 dark:hover:border-zinc-700'}
                                             `}
                                         >
                                             {selectedTicket?._id === ticket._id && (
@@ -254,8 +276,8 @@ const L2CheckerDesk = () => {
                                             </h4>
                                             <div className="flex items-center justify-between mt-auto">
                                                 <ServiceTypeBadge serviceType={ticket.serviceType} />
-                                                <div className="text-[10px] bg-white/80 dark:bg-zinc-950 px-1.5 py-0.5 rounded border border-amber-100 dark:border-zinc-800">
-                                                    {calculateSLA(ticket.createdAt, ticket.assignedPriority)}
+                                                <div className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-zinc-950 rounded border border-amber-100 dark:border-zinc-800">
+                                                    {calculateSLA(ticket.createdAt, ticket.assignedPriority, ticket.status)}
                                                 </div>
                                             </div>
                                         </motion.div>
@@ -277,8 +299,8 @@ const L2CheckerDesk = () => {
             {/* Main Workspace */}
             <main className={`h-full flex-1 flex flex-col relative min-h-0 overflow-hidden ${!selectedTicket ? 'hidden md:flex' : 'flex'}`}>
                 {/* Mobile Back Button */}
-                <div className="md:hidden border-b border-amber-200/60 dark:border-zinc-800 p-2 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md shadow-sm">
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedTicket(null)} className="text-zinc-600 dark:text-zinc-300 font-bold h-8 hover:bg-amber-50 dark:hover:bg-zinc-800">
+                <div className="md:hidden border-b border-zinc-200 dark:border-zinc-800 p-2 bg-white dark:bg-zinc-900 shadow-sm">
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedTicket(null)} className="text-zinc-600 dark:text-zinc-300 font-bold h-8 hover:bg-zinc-100 dark:hover:bg-zinc-800">
                         <ChevronLeft className="h-4 w-4 mr-1" /> Back
                     </Button>
                 </div>
@@ -297,8 +319,11 @@ const L2CheckerDesk = () => {
                                 <div>
                                     <div className="flex items-center gap-2 mb-4">
                                         <ServiceTypeBadge serviceType={selectedTicket.serviceType} />
-                                        <span className="text-[11px] font-mono font-bold text-zinc-500 dark:text-zinc-400 bg-white/60 dark:bg-zinc-900/60 px-2 py-0.5 rounded border border-amber-200/60 dark:border-zinc-800 shadow-sm">
+                                        <span className="text-[11px] font-mono font-bold text-zinc-500 dark:text-zinc-400 bg-white/60 dark:bg-zinc-900/60 px-2 py-0.5 rounded border border-amber-200/60 dark:border-zinc-800 shadow-sm flex items-center gap-1">
                                             ID: {selectedTicket._id}
+                                            <button onClick={() => { navigator.clipboard.writeText(selectedTicket._id); setCopiedId(true); setTimeout(() => setCopiedId(false), 2000); }} className="hover:text-zinc-900 dark:hover:text-zinc-100 ml-1">
+                                                {copiedId ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                            </button>
                                         </span>
                                         <TooltipProvider delayDuration={200}>
                                             <Tooltip>
@@ -433,9 +458,9 @@ const L2CheckerDesk = () => {
                                                                     {doc.ocrExtraction.matchVerified ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
                                                                     {doc.ocrExtraction.matchVerified ? 'OCR Matches CRM Data' : 'OCR Verification Failed'}
                                                                 </p>
-                                                                <p className="text-xs font-mono font-medium text-zinc-700 dark:text-zinc-300 line-clamp-3 leading-relaxed break-words bg-white/80 dark:bg-zinc-900 border border-amber-100 dark:border-zinc-800 p-2 rounded shadow-inner custom-scrollbar">
+                                                                <pre className="text-xs font-mono font-medium text-zinc-700 dark:text-zinc-300 leading-relaxed break-words bg-white/80 dark:bg-zinc-900 border border-amber-100 dark:border-zinc-800 p-2 rounded shadow-inner custom-scrollbar whitespace-pre-wrap max-h-[150px] overflow-y-auto">
                                                                     {doc.ocrExtraction.extractedText || "No text extracted."}
-                                                                </p>
+                                                                </pre>
                                                             </div>
                                                         ) : (
                                                             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium">No automated extraction data available.</p>
@@ -454,7 +479,7 @@ const L2CheckerDesk = () => {
                         </ScrollArea>
 
                         {/* Standard Action Footer */}
-                        <div className="border-t border-amber-200/60 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-4 shadow-[0_-4px_15px_-3px_rgba(120,80,30,0.05)] dark:shadow-none z-20 shrink-0">
+                        <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-sm z-20 shrink-0">
                             <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center gap-4">
                                 <div className="flex-1 w-full">
                                     <Input
@@ -468,21 +493,27 @@ const L2CheckerDesk = () => {
                                     <Button
                                         variant="outline"
                                         onClick={() => handleAction('RETURN_TO_L1')}
+                                        disabled={!!isActionLoading}
                                         className="text-amber-700 dark:text-amber-400 border-amber-200 dark:border-zinc-700 hover:bg-amber-50 dark:hover:bg-zinc-800 hover:text-amber-800 dark:hover:text-amber-300 font-bold flex-1 sm:flex-none bg-white dark:bg-zinc-900"
                                     >
+                                        {isActionLoading === 'RETURN_TO_L1' && <RefreshCcw className="h-4 w-4 animate-spin mr-2" />}
                                         Return to L1
                                     </Button>
                                     <Button
                                         variant="destructive"
                                         onClick={() => handleAction('REJECT')}
+                                        disabled={!!isActionLoading}
                                         className="flex-1 sm:flex-none font-bold bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600"
                                     >
+                                        {isActionLoading === 'REJECT' && <RefreshCcw className="h-4 w-4 animate-spin mr-2" />}
                                         Reject
                                     </Button>
                                     <Button
                                         onClick={() => handleAction('APPROVE')}
+                                        disabled={!!isActionLoading}
                                         className="bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 font-bold flex-1 sm:flex-none shadow-md"
                                     >
+                                        {isActionLoading === 'APPROVE' && <RefreshCcw className="h-4 w-4 animate-spin mr-2" />}
                                         Approve
                                     </Button>
                                 </div>

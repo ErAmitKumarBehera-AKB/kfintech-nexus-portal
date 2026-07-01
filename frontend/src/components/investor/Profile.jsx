@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import apiClient from '../../api/client';
-import { User, Lock, FileText, Download, ShieldCheck, MapPin, Building2 } from 'lucide-react';
+import { User, Lock, FileText, Download, ShieldCheck, MapPin, Building2, Pencil, CalendarIcon } from 'lucide-react';
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +17,8 @@ import { toast } from "sonner";
 import { QRCodeSVG } from 'qrcode.react';
 import { authApi } from '../../api/auth.api';
 import { CometCard } from '../ui/comet-card';
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const INDIAN_BANKS = [
     "HDFC Bank", "State Bank of India (SBI)", "ICICI Bank", "Axis Bank", 
@@ -37,6 +41,7 @@ const Profile = () => {
         accountNumber: user?.bankAccount?.accountNumber || '',
         ifscCode: user?.bankAccount?.ifsc || ''
     });
+    const [isEditing, setIsEditing] = useState(false);
     const [loadingProfile, setLoadingProfile] = useState(false);
     const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
     
@@ -95,6 +100,7 @@ const Profile = () => {
             toast.error(error.response?.data?.message || 'Failed to update profile');
         } finally {
             setLoadingProfile(false);
+            setIsEditing(false);
         }
     };
 
@@ -201,10 +207,19 @@ const Profile = () => {
                 <div className="md:col-span-2 space-y-6">
                     <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-[#131313]">
                         <CardHeader className="border-b border-zinc-100 dark:border-zinc-800 pb-4">
-                            <CardTitle className="text-lg flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-                                <User className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> Personal Information
-                            </CardTitle>
-                            <CardDescription className="text-zinc-500 dark:text-zinc-400">Update your contact and address details.</CardDescription>
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <CardTitle className="text-lg flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                                        <User className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> Personal Information
+                                    </CardTitle>
+                                    <CardDescription className="text-zinc-500 dark:text-zinc-400 mt-1">Update your contact and address details.</CardDescription>
+                                </div>
+                                {!isEditing && (
+                                    <Button variant="ghost" size="icon-sm" onClick={() => setIsEditing(true)}>
+                                        <Pencil className="w-4 h-4 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100" />
+                                    </Button>
+                                )}
+                            </div>
                         </CardHeader>
                         
                         <form onSubmit={handleProfileUpdate}>
@@ -217,7 +232,8 @@ const Profile = () => {
                                             value={profileData.name} 
                                             onChange={e => setProfileData({...profileData, name: e.target.value})}
                                             required
-                                            className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
+                                            disabled={!isEditing}
+                                            className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 disabled:opacity-75 disabled:cursor-not-allowed"
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -237,20 +253,55 @@ const Profile = () => {
                                         <Input 
                                             type="tel" 
                                             required
+                                            inputMode="numeric"
                                             value={profileData.phoneNumber} 
-                                            onChange={e => setProfileData({...profileData, phoneNumber: e.target.value})}
-                                            className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
+                                            onChange={e => {
+                                                const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                                setProfileData({...profileData, phoneNumber: val});
+                                            }}
+                                            placeholder="10-digit number"
+                                            maxLength={10}
+                                            disabled={!isEditing}
+                                            className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 disabled:opacity-75 disabled:cursor-not-allowed"
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-zinc-900 dark:text-zinc-100">Date of Birth</Label>
-                                        <Input 
-                                            type="date" 
-                                            required
-                                            value={profileData.dob} 
-                                            onChange={e => setProfileData({...profileData, dob: e.target.value})}
-                                            className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 dark:[color-scheme:dark]"
-                                        />
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant={"outline"}
+                                                    disabled={!isEditing}
+                                                    className={cn(
+                                                        "w-full justify-start text-left font-normal bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 disabled:opacity-75 disabled:cursor-not-allowed",
+                                                        !profileData.dob && "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
+                                                    {profileData.dob ? format(new Date(profileData.dob), "PPP") : <span>Pick a date</span>}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                                <Calendar
+                                                    mode="single"
+                                                    captionLayout="dropdown-buttons"
+                                                    fromYear={1900}
+                                                    toYear={new Date().getFullYear()}
+                                                    selected={profileData.dob ? new Date(profileData.dob) : undefined}
+                                                    onSelect={(date) => {
+                                                        if (date) {
+                                                            const offset = date.getTimezoneOffset()
+                                                            date = new Date(date.getTime() - (offset*60*1000))
+                                                            setProfileData({...profileData, dob: date.toISOString().split('T')[0]})
+                                                        }
+                                                    }}
+                                                    disabled={(date) =>
+                                                        date > new Date() || date < new Date("1900-01-01")
+                                                    }
+                                                    initialFocus
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
                                     </div>
                                 </div>
 
@@ -264,9 +315,10 @@ const Profile = () => {
                                             <Input 
                                                 type="text" 
                                                 required
+                                                disabled={!isEditing}
                                                 value={profileData.street} 
                                                 onChange={e => setProfileData({...profileData, street: e.target.value})}
-                                                className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
+                                                className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 disabled:opacity-75 disabled:cursor-not-allowed"
                                             />
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -275,9 +327,10 @@ const Profile = () => {
                                                 <Input 
                                                     type="text" 
                                                     required
+                                                    disabled={!isEditing}
                                                     value={profileData.city} 
                                                     onChange={e => setProfileData({...profileData, city: e.target.value})}
-                                                    className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
+                                                    className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 disabled:opacity-75 disabled:cursor-not-allowed"
                                                 />
                                             </div>
                                             <div className="space-y-2">
@@ -285,9 +338,10 @@ const Profile = () => {
                                                 <Input 
                                                     type="text" 
                                                     required
+                                                    disabled={!isEditing}
                                                     value={profileData.state} 
                                                     onChange={e => setProfileData({...profileData, state: e.target.value})}
-                                                    className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
+                                                    className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 disabled:opacity-75 disabled:cursor-not-allowed"
                                                 />
                                             </div>
                                         </div>
@@ -301,8 +355,8 @@ const Profile = () => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label className="text-zinc-900 dark:text-zinc-100">Bank Name</Label>
-                                            <Select value={profileData.bankName} onValueChange={(val) => setProfileData({...profileData, bankName: val})} required>
-                                                <SelectTrigger className="w-full bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
+                                            <Select value={profileData.bankName} onValueChange={(val) => setProfileData({...profileData, bankName: val})} required disabled={!isEditing}>
+                                                <SelectTrigger className="w-full bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 disabled:opacity-75 disabled:cursor-not-allowed">
                                                     <SelectValue placeholder="Select Bank" />
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
@@ -317,31 +371,47 @@ const Profile = () => {
                                             <Input 
                                                 type="text" 
                                                 required
+                                                inputMode="numeric"
                                                 value={profileData.accountNumber} 
-                                                onChange={e => setProfileData({...profileData, accountNumber: e.target.value})}
-                                                className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
+                                                onChange={e => {
+                                                    const val = e.target.value.replace(/\D/g, '');
+                                                    setProfileData({...profileData, accountNumber: val});
+                                                }}
+                                                disabled={!isEditing}
+                                                placeholder="Enter digits only"
+                                                className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 disabled:opacity-75 disabled:cursor-not-allowed"
                                             />
                                         </div>
                                     </div>
-                                    <div className="space-y-2 max-w-xs">
+                                    <div className="space-y-2 max-w-xs mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                                         <Label className="text-zinc-900 dark:text-zinc-100">IFSC Code</Label>
                                         <Input 
                                             type="text" 
                                             required
                                             value={profileData.ifscCode} 
-                                            onChange={e => setProfileData({...profileData, ifscCode: e.target.value})}
-                                            className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase"
+                                            onChange={e => {
+                                                const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+                                                setProfileData({...profileData, ifscCode: val});
+                                            }}
+                                            disabled={!isEditing}
+                                            placeholder="e.g. SBIN0001234"
+                                            className="bg-white dark:bg-[#131313] border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 uppercase disabled:opacity-75 disabled:cursor-not-allowed"
                                             maxLength={11}
                                         />
                                     </div>
                                 </div>
 
                             </CardContent>
-                            <CardFooter className="bg-zinc-50 dark:bg-[#1A1A1A] border-t border-zinc-100 dark:border-zinc-800 py-4 flex justify-end">
-                                <Button type="submit" disabled={loadingProfile} className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white">
-                                    {loadingProfile ? 'Saving...' : 'Save Changes'}
-                                </Button>
-                            </CardFooter>
+                            {isEditing && (
+                                <CardFooter className="bg-zinc-50 dark:bg-[#1A1A1A] border-t border-zinc-100 dark:border-zinc-800 py-4 flex justify-end gap-2">
+                                    <Button type="button" variant="outline" onClick={() => setIsEditing(false)} disabled={loadingProfile}>
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={loadingProfile} className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white">
+                                        {loadingProfile ? 'Saving...' : 'Save Changes'}
+                                    </Button>
+                                </CardFooter>
+                            )}
                         </form>
                     </Card>
                 </div>
@@ -454,7 +524,7 @@ const Profile = () => {
                                             placeholder="Enter 6-digit code"
                                             value={otpCode}
                                             onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                            className="text-center tracking-widest text-lg bg-zinc-50 dark:bg-black/50 border-zinc-200 dark:border-zinc-800"
+                                            className="text-center tracking-widest text-lg bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
                                             required
                                         />
                                     </div>

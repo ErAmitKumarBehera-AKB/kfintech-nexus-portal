@@ -179,10 +179,11 @@ const CreateTicketFlow = ({ onTabChange }) => {
         title: '',
         description: '',
         investorName: user?.name || '',
-        accountNumber: ''
+        accountNumber: user?.bankAccount?.accountNumber || ''
     });
     const [serviceMetadata, setServiceMetadata] = useState({});
-    const [file, setFile] = useState(null);
+    const [files, setFiles] = useState([]);
+    const [vaultDocs, setVaultDocs] = useState([]);
     const [status, setStatus] = useState({ type: '', message: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -235,7 +236,11 @@ const CreateTicketFlow = ({ onTabChange }) => {
             payload.append('accountNumber', formData.accountNumber);
             payload.append('serviceType', selectedType);
             payload.append('serviceMetadata', JSON.stringify(serviceMetadata));
-            if (file) payload.append('documents', file);
+            files.forEach(f => payload.append('documents', f));
+            
+            if (vaultDocs.length > 0) {
+                payload.append('existingDocuments', JSON.stringify(vaultDocs));
+            }
 
             await apiClient.post('/tickets', payload, {
                 headers: { 'Content-Type': 'multipart/form-data' }
@@ -252,9 +257,10 @@ const CreateTicketFlow = ({ onTabChange }) => {
             });
             
             setSelectedType(null);
-            setFormData({ title: '', description: '', investorName: user?.name || '', accountNumber: '' });
+            setFormData({ title: '', description: '', investorName: user?.name || '', accountNumber: user?.bankAccount?.accountNumber || '' });
             setServiceMetadata({});
-            setFile(null);
+            setFiles([]);
+            setVaultDocs([]);
             
             // Route back to My Tickets after a moment
             setTimeout(() => {
@@ -414,14 +420,40 @@ const CreateTicketFlow = ({ onTabChange }) => {
                                         </Label>
                                         
                                         <div 
-                                            onClick={() => fileInputRef.current?.click()}
-                                            className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer bg-zinc-50 dark:bg-[#1A1A1A]/50 hover:bg-zinc-100 dark:hover:bg-[#1A1A1A] transition-colors"
+                                            onClick={() => files.length === 0 && fileInputRef.current?.click()}
+                                            className={`border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-8 flex flex-col items-center justify-center transition-colors ${files.length === 0 ? 'cursor-pointer bg-zinc-50 dark:bg-[#1A1A1A]/50 hover:bg-zinc-100 dark:hover:bg-[#1A1A1A]' : 'bg-white dark:bg-[#131313]'}`}
                                         >
-                                            <input type="file" className="hidden" ref={fileInputRef} accept="image/jpeg,image/png,application/pdf" required={currentConfig.requiredDocuments.length > 0 && !file} onChange={e => setFile(e.target.files[0])} />
-                                            {file ? (
-                                                <div className="text-center">
-                                                    <FileText className="w-8 h-8 text-zinc-900 dark:text-zinc-100 mx-auto mb-2" />
-                                                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{file.name}</p>
+                                            <input type="file" className="hidden" ref={fileInputRef} multiple accept="image/jpeg,image/png,application/pdf" required={currentConfig.requiredDocuments.length > 0 && files.length === 0} onChange={e => {
+                                                const selectedFiles = Array.from(e.target.files);
+                                                setFiles(prev => [...prev, ...selectedFiles]);
+                                            }} />
+                                            {files.length > 0 ? (
+                                                <div className="w-full space-y-2">
+                                                    {files.map((f, i) => (
+                                                        <div key={i} className="flex items-center justify-between bg-zinc-50 dark:bg-[#1A1A1A] p-3 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                                <FileText className="w-5 h-5 text-zinc-500 shrink-0" />
+                                                                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{f.name}</span>
+                                                            </div>
+                                                            <button type="button" onClick={(e) => { e.stopPropagation(); setFiles(files.filter((_, idx) => idx !== i)); }} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-md transition-colors">
+                                                                <X className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    {vaultDocs.map((vd, i) => (
+                                                        <div key={`vd-${i}`} className="flex items-center justify-between bg-zinc-50 dark:bg-[#1A1A1A] p-3 rounded-lg border border-amber-200/50 dark:border-amber-900/30">
+                                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                                <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0" />
+                                                                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{vd.name} (Vault)</span>
+                                                            </div>
+                                                            <button type="button" onClick={(e) => { e.stopPropagation(); setVaultDocs(vaultDocs.filter((_, idx) => idx !== i)); }} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-md transition-colors">
+                                                                <X className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    <Button type="button" variant="outline" size="sm" className="w-full mt-2" onClick={() => fileInputRef.current?.click()}>
+                                                        Add more files
+                                                    </Button>
                                                 </div>
                                             ) : (
                                                 <div className="text-center text-zinc-500 dark:text-zinc-400">
@@ -431,6 +463,30 @@ const CreateTicketFlow = ({ onTabChange }) => {
                                                 </div>
                                             )}
                                         </div>
+                                        
+                                        {/* Vault Document Selection */}
+                                        {user?.kyc && (user.kyc.aadhaar || user.kyc.pan || user.kyc.dl) && (
+                                            <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                                                <p className="text-xs font-medium text-zinc-500 mb-2">Or select from your verified Vault:</p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {user.kyc.aadhaar && !vaultDocs.find(d => d.name === 'Aadhaar Card') && (
+                                                        <Button type="button" variant="outline" size="sm" className="h-7 text-xs bg-white dark:bg-[#131313]" onClick={() => setVaultDocs([...vaultDocs, { name: 'Aadhaar Card', url: user.kyc.aadhaar }])}>
+                                                            + Aadhaar
+                                                        </Button>
+                                                    )}
+                                                    {user.kyc.pan && !vaultDocs.find(d => d.name === 'PAN Card') && (
+                                                        <Button type="button" variant="outline" size="sm" className="h-7 text-xs bg-white dark:bg-[#131313]" onClick={() => setVaultDocs([...vaultDocs, { name: 'PAN Card', url: user.kyc.pan }])}>
+                                                            + PAN Card
+                                                        </Button>
+                                                    )}
+                                                    {user.kyc.dl && !vaultDocs.find(d => d.name === 'Driving License') && (
+                                                        <Button type="button" variant="outline" size="sm" className="h-7 text-xs bg-white dark:bg-[#131313]" onClick={() => setVaultDocs([...vaultDocs, { name: 'Driving License', url: user.kyc.dl }])}>
+                                                            + Driving License
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </form>
                             </CardContent>
@@ -492,12 +548,23 @@ const CreateTicketFlow = ({ onTabChange }) => {
                                     </div>
                                 )}
 
-                                <div className={`flex items-center gap-3 p-4 rounded-lg border ${file ? 'bg-zinc-50 dark:bg-[#1A1A1A] border-zinc-200 dark:border-zinc-700' : 'bg-white dark:bg-[#131313] border-dashed border-zinc-200 dark:border-zinc-800'}`}>
-                                    {file ? <CheckCircle2 className="w-5 h-5 text-zinc-900 dark:text-zinc-100 shrink-0" /> : <AlertCircle className="w-5 h-5 text-zinc-400 shrink-0" />}
-                                    <div>
-                                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{file ? file.name : 'No document attached'}</p>
-                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Document upload status</p>
+                                <div className={`flex flex-col gap-3 p-4 rounded-lg border ${files.length > 0 ? 'bg-zinc-50 dark:bg-[#1A1A1A] border-zinc-200 dark:border-zinc-700' : 'bg-white dark:bg-[#131313] border-dashed border-zinc-200 dark:border-zinc-800'}`}>
+                                    <div className="flex items-center gap-3">
+                                        {files.length > 0 ? <CheckCircle2 className="w-5 h-5 text-zinc-900 dark:text-zinc-100 shrink-0" /> : <AlertCircle className="w-5 h-5 text-zinc-400 shrink-0" />}
+                                        <div>
+                                            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{files.length > 0 ? `${files.length} document(s) attached` : 'No document attached'}</p>
+                                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Document upload status</p>
+                                        </div>
                                     </div>
+                                    {files.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {files.map((f, i) => (
+                                                <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
+                                                    {f.name}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>

@@ -37,7 +37,13 @@ router.get('/tickets/flagged', authenticate, authorize('ADMIN_SUPER'), adminCont
 // Route: GET /api/admin/reports/export — CSV report export
 router.get('/reports/export', authenticate, authorize('ADMIN_SUPER'), adminController.exportReports);
 
-// Route: GET /api/admin/agents/activities — L1/L2 agent audit trail
+// Route: GET /api/admin/agents/activities — L1/L2 agent audit trail (with optional ?agentId= filter)
 router.get('/agents/activities', authenticate, authorize('ADMIN_SUPER'), adminController.getAgentActivities);
+
+// Route: GET /api/admin/agents/activities/export — Download CSV (all or per-agent)
+router.get('/agents/activities/export', authenticate, authorize('ADMIN_SUPER'), adminController.exportAgentActivities);
+
+// Route: GET /api/admin/agents — List of all L1/L2 agents for dropdown
+router.get('/agents', authenticate, authorize('ADMIN_SUPER'), adminController.getAgentList);
 
 module.exports = router;

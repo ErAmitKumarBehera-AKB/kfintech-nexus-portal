@@ -35,7 +35,7 @@ const ProfileCompletionModal = ({ onGoToProfile }) => {
                     </div>
                     <DialogTitle className="text-xl text-zinc-900 dark:text-zinc-50">Complete Your Profile</DialogTitle>
                     <DialogDescription className="text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed">
-                        Welcome to Nexus Portal! To ensure platform security and regulatory compliance, you must complete your KYC profile before you can submit or view tickets.
+                        Welcome to FinnovaX! To ensure platform security and regulatory compliance, you must complete your KYC profile before you can submit or view tickets.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="mt-6 flex flex-col sm:flex-row justify-end relative z-10">

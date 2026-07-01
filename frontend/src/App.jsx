@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth, getRoleDefaultRoute } from './context/AuthContext';
 import { Toaster } from "@/components/ui/sonner";
+import { Leapfrog } from 'ldrs/react';
+import 'ldrs/react/Leapfrog.css';
 
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -18,16 +20,29 @@ import L2CheckerDesk from './pages/L2CheckerDesk';
 import AdminDashboard from './pages/AdminDashboard';
 import ProfilePage from './pages/ProfilePage';
 
+const CHATBOT_ALLOWED_PATHS = ['/', '/login', '/register', '/forgot-password', '/investor'];
+
 const AppRoutes = () => {
     const { user, isAuthenticated, isLoading } = useAuth();
     const location = useLocation();
+
+    // Show chatbot only on specific public/investor routes
+    const showChatbot = CHATBOT_ALLOWED_PATHS.some(path =>
+        location.pathname === path || location.pathname.startsWith('/investor')
+    );
 
     if (isLoading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-black text-white font-sans">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-white/20 border-t-white" />
-                    <h2 className="text-xl font-medium tracking-tight mb-2">FinnovaX</h2>
+                    <div className="mx-auto mb-4 flex justify-center">
+                        <Leapfrog
+                            size="40"
+                            speed="2.5"
+                            color="white" 
+                        />
+                    </div>
+                    <h2 className="text-xl font-medium tracking-tight mb-2 mt-4">FinnovaX</h2>
                     <p className="text-sm text-zinc-500 max-w-xs text-center animate-pulse">
                         Restoring your secure session...
                     </p>
@@ -127,7 +142,7 @@ const AppRoutes = () => {
                 </Routes>
             </main>
 
-            <ChatbotWidget />
+            {showChatbot && <ChatbotWidget />}
         </div>
     );
 };

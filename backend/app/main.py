@@ -17,17 +17,40 @@ if platform.system() == "Windows":
         pass
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.routes import sentiment, ocr, chatbot, health, summarizer
 
-app = FastAPI(title="KFintech Nexus Portal AI Models API")
+app = FastAPI(
+    title="FinnovaX AI Engine",
+    description="OCR, Sentiment Analysis, RAG Chatbot & Summarization API",
+    version="1.0.0"
+)
 
-# Include the routers
-app.include_router(sentiment.router, prefix="/sentiment", tags=["Sentiment"])
-app.include_router(ocr.router, prefix="/ocr", tags=["OCR Verification"])
-app.include_router(chatbot.router, prefix="/chatbot", tags=["RAG Chatbot"])
-app.include_router(summarizer.router, prefix="/summarize", tags=["Summarizer"])
-app.include_router(health.router, prefix="/health", tags=["Health"])
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# Allow Node.js backend(s) to call this service.
+# Set ALLOWED_ORIGINS env var in production (comma-separated).
+_raw_origins = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5000,http://127.0.0.1:5000"
+)
+allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ── Routers ───────────────────────────────────────────────────────────────────
+app.include_router(sentiment.router,  prefix="/sentiment",  tags=["Sentiment"])
+app.include_router(ocr.router,        prefix="/ocr",        tags=["OCR Verification"])
+app.include_router(chatbot.router,    prefix="/chatbot",    tags=["RAG Chatbot"])
+app.include_router(summarizer.router, prefix="/summarize",  tags=["Summarizer"])
+app.include_router(health.router,     prefix="/health",     tags=["Health"])
+
+# ── Startup ───────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup_event():
     """Auto-seed the ChromaDB knowledge base on every startup if empty."""
@@ -36,9 +59,13 @@ async def startup_event():
         seed_faqs()
         print("✅ ChromaDB FAQ knowledge base ready.")
     except Exception as e:
-        print(f"⚠️ ChromaDB seeding failed (non-critical): {e}")
+        print(f"⚠️  ChromaDB seeding failed (non-critical): {e}")
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the KFintech Nexus Portal AI Models API. Use /docs to view the API documentation."}
-
+    return {
+        "service": "FinnovaX AI Engine",
+        "version": "1.0.0",
+        "status": "running",
+        "docs": "/docs"
+    }

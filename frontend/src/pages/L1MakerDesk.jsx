@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import apiClient from '../api/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { Clock, ShieldAlert, Cpu, ChevronRight, ChevronLeft, FileText, XCircle, AlertTriangle, Sparkles, Filter, Search, BarChart2, RefreshCw } from 'lucide-react';
+import { Clock, ShieldAlert, Cpu, ChevronRight, ChevronLeft, FileText, XCircle, AlertTriangle, Sparkles, Filter, Search, BarChart2, RefreshCw, Copy, Check } from 'lucide-react';
 import { getServiceType } from '../config/serviceTypes';
 import { format } from 'date-fns';
 
@@ -50,6 +50,8 @@ const L1MakerDesk = () => {
     const [loadingSentiment, setLoadingSentiment] = useState(false);
     const [ticketSentiment, setTicketSentiment] = useState(null);
     const [fetchError, setFetchError] = useState(null);
+    const [copiedId, setCopiedId] = useState(false);
+    const [isActionLoading, setIsActionLoading] = useState({ approve: false, reject: false, escalate: false });
 
     // Filtering State
     const [filterStatus, setFilterStatus] = useState('ALL');
@@ -89,8 +91,12 @@ const L1MakerDesk = () => {
         fetchQueue();
     }, [filterStatus, filterPriority, filterAssigned, filterAge, filterSearch, page]);
 
-    const calculateSLA = (dateString, priority) => {
+    const calculateSLA = (dateString, priority, status) => {
         if (!dateString) return <span className="text-zinc-500 dark:text-zinc-400">N/A</span>;
+        
+        if (['CLOSED', 'RESOLVED', 'REJECTED'].includes(status)) {
+            return <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1"><Check className="w-3 h-3" /> SLA Met</span>;
+        }
 
         let slaHours = 24;
         if (priority === 'CRITICAL') slaHours = 2;
@@ -100,12 +106,12 @@ const L1MakerDesk = () => {
         const deadline = createdTime + (slaHours * 60 * 60 * 1000);
         const now = new Date().getTime();
         const diffMs = deadline - now;
+        const diffMins = Math.floor(diffMs / 60000);
 
-        if (diffMs <= 0) {
-            return <span className="text-red-600 dark:text-red-400 font-bold">SLA BREACHED</span>;
+        if (diffMins < 0) {
+            return <span className="text-red-500 dark:text-red-400 font-semibold flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Breached</span>;
         }
 
-        const diffMins = Math.floor(diffMs / 60000);
         if (diffMins < 60) {
             return <span className="text-amber-600 dark:text-amber-500 font-semibold">{diffMins}m remaining</span>;
         }
@@ -134,6 +140,7 @@ const L1MakerDesk = () => {
 
     const handleEscalate = async () => {
         if (!selectedTicket) return;
+        setIsActionLoading(prev => ({ ...prev, escalate: true }));
         try {
             await apiClient.post(`/l1/tickets/${selectedTicket._id}/escalate`, { notes });
             setQueue(q => q.filter(t => t._id !== selectedTicket._id));
@@ -141,6 +148,8 @@ const L1MakerDesk = () => {
             setNotes('');
         } catch (error) {
             alert(`Escalation failed: ${error.response?.data?.message || error.message}`);
+        } finally {
+            setIsActionLoading(prev => ({ ...prev, escalate: false }));
         }
     };
 
@@ -148,6 +157,7 @@ const L1MakerDesk = () => {
         if (!selectedTicket) return;
         if (!notes) { alert("Please provide notes/reason for rejection"); return; }
         if (!window.confirm('Reject this request? This action will permanently close the ticket.')) return;
+        setIsActionLoading(prev => ({ ...prev, reject: true }));
         try {
             await apiClient.post(`/l1/tickets/${selectedTicket._id}/reject`, { reason: notes });
             setQueue(q => q.filter(t => t._id !== selectedTicket._id));
@@ -155,6 +165,8 @@ const L1MakerDesk = () => {
             setNotes('');
         } catch (error) {
             alert(`Rejection failed: ${error.response?.data?.message || error.message}`);
+        } finally {
+            setIsActionLoading(prev => ({ ...prev, reject: false }));
         }
     };
 
@@ -181,8 +193,21 @@ const L1MakerDesk = () => {
             setTicketSentiment(res.data.sentiment);
         } catch (error) {
             console.error('Sentiment error:', error);
+            alert(error.response?.data?.message || "Sentiment Analysis failed.");
+            setTicketSentiment(null);
         } finally {
             setLoadingSentiment(false);
+        }
+    };
+
+    const handleSetPriority = async (priority) => {
+        if (!selectedTicket) return;
+        try {
+            const res = await apiClient.patch(`/l1/tickets/${selectedTicket._id}/priority`, { priority });
+            setSelectedTicket(prev => ({ ...prev, assignedPriority: priority }));
+            setQueue(q => q.map(t => t._id === selectedTicket._id ? { ...t, assignedPriority: priority } : t));
+        } catch (error) {
+            alert(`Priority update failed: ${error.response?.data?.message || error.message}`);
         }
     };
 
@@ -195,9 +220,9 @@ const L1MakerDesk = () => {
 
     if (loading && queue.length === 0 && !selectedTicket) {
         return (
-            <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-[#faf7f2] dark:bg-[#0f0f12]">
+            <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-[#faf9f6] dark:bg-zinc-950">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-200 dark:border-zinc-800 border-t-amber-600 dark:border-t-zinc-400" />
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 dark:border-zinc-800 border-t-zinc-800 dark:border-t-zinc-300" />
                     <span className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 animate-pulse">Loading Workspace...</span>
                 </div>
             </div>
@@ -205,10 +230,9 @@ const L1MakerDesk = () => {
     }
 
     return (
-        <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] overflow-hidden bg-[#faf7f2] dark:bg-[#0f0f12]">
-            {/* Sidebar: L1 Queue */}
-            <aside className={`w-full md:w-[380px] shrink-0 border-r border-amber-200/60 dark:border-zinc-800/80 bg-white/40 dark:bg-zinc-950/40 backdrop-blur-md flex-col shadow-sm z-10 ${selectedTicket ? 'hidden md:flex' : 'flex'}`}>
-                <div className="p-4 border-b border-amber-200/60 dark:border-zinc-800/80 bg-white/50 dark:bg-zinc-900/50 flex flex-col">
+        <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] overflow-hidden bg-[#faf9f6] dark:bg-[#0A0A0A]">
+            <aside className={`w-full md:w-[380px] shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#131313] flex-col shadow-sm z-10 ${selectedTicket ? 'hidden md:flex' : 'flex'}`}>
+                <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#131313] flex flex-col">
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-bold flex items-center gap-2 text-zinc-900 dark:text-zinc-100 tracking-tight">
                             <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-500" />
@@ -248,7 +272,6 @@ const L1MakerDesk = () => {
                         </div>
                     </div>
 
-                    {/* Filters Section */}
                     <div className="pt-4 space-y-3">
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
@@ -256,15 +279,15 @@ const L1MakerDesk = () => {
                                 placeholder="Search tickets..."
                                 value={filterSearch}
                                 onChange={e => setFilterSearch(e.target.value)}
-                                className="pl-9 h-9 bg-white/70 dark:bg-zinc-900/70 border-amber-200/70 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+                                className="pl-9 h-9 bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                             />
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             <Select value={filterStatus} onValueChange={setFilterStatus}>
-                                <SelectTrigger className="h-8 text-xs bg-white/70 dark:bg-zinc-900/70 border-amber-200/70 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
+                                <SelectTrigger className="h-8 text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100">
                                     <SelectValue placeholder="Status" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-white dark:bg-zinc-900 border-amber-200/70 dark:border-zinc-800">
+                                <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
                                     <SelectItem value="ALL">All Status</SelectItem>
                                     <SelectItem value="OPEN">Open</SelectItem>
                                     <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
@@ -272,20 +295,20 @@ const L1MakerDesk = () => {
                                 </SelectContent>
                             </Select>
                             <Select value={filterAssigned} onValueChange={setFilterAssigned}>
-                                <SelectTrigger className="h-8 text-xs bg-white/70 dark:bg-zinc-900/70 border-amber-200/70 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
+                                <SelectTrigger className="h-8 text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100">
                                     <SelectValue placeholder="Assign" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-white dark:bg-zinc-900 border-amber-200/70 dark:border-zinc-800">
+                                <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
                                     <SelectItem value="ALL">All</SelectItem>
                                     <SelectItem value="ME">Me</SelectItem>
                                     <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
                                 </SelectContent>
                             </Select>
                             <Select value={filterPriority} onValueChange={setFilterPriority}>
-                                <SelectTrigger className="h-8 text-xs bg-white/70 dark:bg-zinc-900/70 border-amber-200/70 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
+                                <SelectTrigger className="h-8 text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100">
                                     <SelectValue placeholder="Priority" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-white dark:bg-zinc-900 border-amber-200/70 dark:border-zinc-800">
+                                <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
                                     <SelectItem value="ALL">All</SelectItem>
                                     <SelectItem value="CRITICAL">Critical</SelectItem>
                                     <SelectItem value="HIGH">High</SelectItem>
@@ -293,10 +316,10 @@ const L1MakerDesk = () => {
                                 </SelectContent>
                             </Select>
                             <Select value={filterAge} onValueChange={setFilterAge}>
-                                <SelectTrigger className="h-8 text-xs bg-white/70 dark:bg-zinc-900/70 border-amber-200/70 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
+                                <SelectTrigger className="h-8 text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100">
                                     <SelectValue placeholder="Newest" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-white dark:bg-zinc-900 border-amber-200/70 dark:border-zinc-800">
+                                <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
                                     <SelectItem value="NEWEST">Newest</SelectItem>
                                     <SelectItem value="OLDEST">Oldest</SelectItem>
                                 </SelectContent>
@@ -339,8 +362,8 @@ const L1MakerDesk = () => {
                                             className={`
                                                 relative overflow-hidden p-4 rounded-xl border cursor-pointer transition-all duration-200
                                                 ${selectedTicket?._id === ticket._id 
-                                                    ? 'bg-white border-amber-300 shadow-[0_4px_16px_rgba(120,80,30,0.08)] dark:bg-zinc-800 dark:border-zinc-600' 
-                                                    : 'bg-white/60 border-amber-200/60 hover:bg-white hover:border-amber-300 dark:bg-zinc-900/60 dark:border-zinc-800 hover:dark:bg-zinc-800/80 hover:dark:border-zinc-700'}
+                                                    ? 'bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 shadow-md' 
+                                                    : 'bg-white/60 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 hover:border-zinc-300 dark:hover:bg-zinc-800 dark:hover:border-zinc-700'}
                                             `}
                                         >
                                             {selectedTicket?._id === ticket._id && (
@@ -367,7 +390,7 @@ const L1MakerDesk = () => {
                                             <div className="mt-3 flex items-center justify-between text-[11px]">
                                                 <div className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-zinc-950 rounded border border-amber-100 dark:border-zinc-800">
                                                     <Clock className="h-3 w-3 text-amber-600 dark:text-zinc-400" />
-                                                    {calculateSLA(ticket.createdAt, ticket.assignedPriority)}
+                                                    {calculateSLA(ticket.createdAt, ticket.assignedPriority, ticket.status)}
                                                 </div>
                                             </div>
                                         </div>
@@ -390,10 +413,8 @@ const L1MakerDesk = () => {
                 </div>
             </aside>
 
-            {/* Main Workspace */}
             <main className={`flex-1 flex flex-col relative min-h-0 overflow-hidden ${!selectedTicket ? 'hidden md:flex' : 'flex'}`}>
-                {/* Mobile Back Button */}
-                <div className="md:hidden border-b border-amber-200/60 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md p-2">
+                <div className="md:hidden border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2">
                     <Button variant="ghost" size="sm" onClick={() => setSelectedTicket(null)} className="text-zinc-600 dark:text-zinc-300">
                         <ChevronLeft className="h-4 w-4 mr-1" /> Back to Queue
                     </Button>
@@ -408,14 +429,16 @@ const L1MakerDesk = () => {
                     >
                         <ScrollArea className="flex-1 min-h-0 custom-scrollbar">
                             <div className="max-w-4xl mx-auto space-y-6 pb-24 p-4 md:p-6">
-                                {/* Header */}
                                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                                     <div>
                                         <div className="flex items-center gap-2 mb-2 flex-wrap">
                                             <ServiceTypeBadge serviceType={selectedTicket.serviceType} />
                                             <PriorityBadge priority={selectedTicket.assignedPriority} />
-                                            <span className="text-xs font-mono font-bold text-zinc-500 dark:text-zinc-400 px-2 py-1 bg-white/60 dark:bg-zinc-900/60 border border-amber-200/60 dark:border-zinc-800 rounded-md shadow-sm">
+                                            <span className="text-xs font-mono font-bold text-zinc-500 dark:text-zinc-400 px-2 py-1 bg-white/60 dark:bg-[#1A1A1A]/60 border border-amber-200/60 dark:border-zinc-800 rounded-md shadow-sm flex items-center gap-1">
                                                 ID: {selectedTicket._id}
+                                                <button onClick={() => { navigator.clipboard.writeText(selectedTicket._id); setCopiedId(true); setTimeout(() => setCopiedId(false), 2000); }} className="hover:text-zinc-900 dark:hover:text-zinc-100 ml-1">
+                                                    {copiedId ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                                </button>
                                             </span>
                                         </div>
                                         <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
@@ -431,7 +454,6 @@ const L1MakerDesk = () => {
                                     )}
                                 </div>
 
-                                {/* L2 Return Note Banner */}
                                 {selectedTicket.l2ReturnNote && (
                                     <Alert className="bg-amber-50/90 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 backdrop-blur-sm shadow-sm">
                                         <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
@@ -463,7 +485,6 @@ const L1MakerDesk = () => {
                                             {stripPrefix(selectedTicket.description || selectedTicket.title)}
                                         </p>
 
-                                        {/* Service Metadata Panel */}
                                         {selectedTicket.serviceMetadata && Object.keys(selectedTicket.serviceMetadata).length > 0 && (() => {
                                             const stConfig = getServiceType(selectedTicket.serviceType);
                                             return (
@@ -486,35 +507,35 @@ const L1MakerDesk = () => {
                                             );
                                         })()}
 
-                                        {/* AI Analysis: Two Cards Side by Side */}
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                            {/* AI Summary Card */}
-                                            <div className="border border-amber-200/60 dark:border-zinc-700/60 bg-white/70 dark:bg-zinc-800/40 rounded-lg overflow-hidden shadow-sm">
-                                                <div className="bg-amber-50/60 dark:bg-zinc-900/60 px-4 py-3 border-b border-amber-200/60 dark:border-zinc-700/60 flex items-center justify-between">
-                                                    <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                                                        <Sparkles className="h-4 w-4 text-amber-500" /> AI Summary
+                                            <div className="border border-violet-200/60 dark:border-violet-500/20 bg-white/70 dark:bg-violet-900/10 rounded-lg overflow-hidden shadow-sm">
+                                                <div className="bg-violet-50/60 dark:bg-violet-900/20 px-4 py-3 border-b border-violet-200/60 dark:border-violet-500/20 flex items-center justify-between">
+                                                    <h4 className="text-sm font-bold text-violet-900 dark:text-violet-300 flex items-center gap-2">
+                                                        <Sparkles className="h-4 w-4 text-violet-500" /> AI Executive Summary
                                                     </h4>
                                                     <Button
                                                         onClick={handleSummarize}
                                                         disabled={loadingSummary}
                                                         size="sm"
                                                         variant="outline"
-                                                        className="h-7 text-xs bg-white dark:bg-zinc-800 border-amber-200 dark:border-zinc-700 hover:bg-amber-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200"
+                                                        className="h-7 text-xs bg-white dark:bg-[#131313] border-violet-200 dark:border-violet-500/30 hover:bg-violet-50 dark:hover:bg-violet-900/30 text-violet-700 dark:text-violet-300"
                                                     >
-                                                        {loadingSummary ? <RefreshCw className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1 text-amber-500" />}
-                                                        {loadingSummary ? 'Generating...' : (selectedTicket.aiSummary?.length > 0 && selectedTicket.aiSummary[0] !== 'Pending AI Triage' ? 'Regenerate' : 'Generate')}
+                                                        {loadingSummary ? <RefreshCw className="h-3 w-3 mr-1 animate-spin" /> : <Cpu className="h-3 w-3 mr-1" />}
+                                                        {loadingSummary ? 'Generating...' : (selectedTicket.aiSummary?.length > 0 ? 'Regenerate' : 'Generate')}
                                                     </Button>
                                                 </div>
-                                                <div className="p-4 min-h-[120px]">
+                                                <div className="p-4 bg-white/40 dark:bg-transparent min-h-[120px]">
                                                     {loadingSummary ? (
                                                         <div className="space-y-2">
-                                                            {[1, 2, 3].map(i => <div key={i} className="h-3 bg-amber-100/60 dark:bg-zinc-700/60 rounded animate-pulse" style={{ width: `${90 - i * 12}%` }} />)}
+                                                            <div className="h-3 bg-violet-100/60 dark:bg-violet-900/30 rounded animate-pulse w-3/4" />
+                                                            <div className="h-3 bg-violet-100/60 dark:bg-violet-900/30 rounded animate-pulse w-full" />
+                                                            <div className="h-3 bg-violet-100/60 dark:bg-violet-900/30 rounded animate-pulse w-2/3" />
                                                         </div>
                                                     ) : selectedTicket.aiSummary?.length > 0 && selectedTicket.aiSummary[0] !== 'Pending AI Triage' && !selectedTicket.aiSummary[0].includes('Failed') ? (
                                                         <ul className="space-y-2">
                                                             {selectedTicket.aiSummary.map((bullet, idx) => (
                                                                 <li key={idx} className="flex gap-2 text-sm font-medium text-zinc-800 dark:text-zinc-300">
-                                                                    <span className="text-amber-500 shrink-0">•</span>
+                                                                    <span className="text-violet-500 shrink-0">•</span>
                                                                     <span>{bullet}</span>
                                                                 </li>
                                                             ))}
@@ -525,7 +546,6 @@ const L1MakerDesk = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Sentiment Card */}
                                             <div className="border border-amber-200/60 dark:border-zinc-700/60 bg-white/70 dark:bg-zinc-800/40 rounded-lg overflow-hidden shadow-sm">
                                                 <div className="bg-amber-50/60 dark:bg-zinc-900/60 px-4 py-3 border-b border-amber-200/60 dark:border-zinc-700/60 flex items-center justify-between">
                                                     <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -632,9 +652,9 @@ const L1MakerDesk = () => {
                                                             </h5>
 
                                                             {doc.ocrExtraction?.extractedText ? (
-                                                                <div className="bg-white/80 dark:bg-zinc-950 border border-amber-200/60 dark:border-zinc-800 rounded-md p-3 text-xs font-mono font-medium text-zinc-700 dark:text-zinc-300 max-h-[150px] overflow-y-auto whitespace-pre-wrap custom-scrollbar">
+                                                                <pre className="bg-white/80 dark:bg-[#1A1A1A] border border-amber-200/60 dark:border-zinc-800 rounded-md p-3 text-xs font-mono font-medium text-zinc-700 dark:text-zinc-300 max-h-[150px] overflow-y-auto whitespace-pre-wrap custom-scrollbar">
                                                                     {doc.ocrExtraction.extractedText}
-                                                                </div>
+                                                                </pre>
                                                             ) : (
                                                                 <div className="flex flex-col items-center justify-center h-[150px] border border-dashed border-amber-300 dark:border-zinc-700 rounded-md bg-white/50 dark:bg-zinc-900/50">
                                                                     <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">No OCR data available.</p>
@@ -667,25 +687,48 @@ const L1MakerDesk = () => {
                         </ScrollArea>
 
                         {/* Sticky Action Footer */}
-                        <div className="border-t border-amber-200/60 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-4 shadow-[0_-4px_15px_-3px_rgba(120,80,30,0.05)] dark:shadow-none z-20 shrink-0">
-                            <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4 items-end">
-                                <div className="flex-1 w-full relative">
-                                    <Textarea
-                                        rows={2}
-                                        placeholder="Enter Maker Notes or findings here before escalation..."
-                                        value={notes}
-                                        onChange={(e) => setNotes(e.target.value)}
-                                        className="resize-none bg-white/90 dark:bg-zinc-950 border-amber-200/60 dark:border-zinc-800 focus-visible:ring-amber-400/40 dark:focus-visible:ring-zinc-700 w-full text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
-                                    />
+                        <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-sm z-20 shrink-0">
+                            <div className="max-w-4xl mx-auto space-y-3">
+                                {/* Priority Selector Row */}
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider shrink-0">Set Priority:</span>
+                                    {['NORMAL', 'HIGH', 'CRITICAL'].map(p => (
+                                        <button
+                                            key={p}
+                                            onClick={() => handleSetPriority(p)}
+                                            className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                                                selectedTicket?.assignedPriority === p
+                                                    ? p === 'CRITICAL' ? 'bg-red-600 text-white border-red-600'
+                                                    : p === 'HIGH'     ? 'bg-amber-500 text-white border-amber-500'
+                                                    :                    'bg-blue-500 text-white border-blue-500'
+                                                    : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
+                                            }`}
+                                        >
+                                            {p}
+                                        </button>
+                                    ))}
                                 </div>
-                                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
-                                    <Button variant="destructive" onClick={handleReject} className="flex-1 sm:flex-none whitespace-nowrap bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 font-bold">
-                                        <XCircle className="mr-2 h-4 w-4" /> Reject
-                                    </Button>
-                                    <Button onClick={handleEscalate} className="w-full sm:w-auto bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 text-white font-bold whitespace-nowrap shadow-md">
-                                        Escalate to L2
-                                        <ChevronRight className="ml-2 h-4 w-4" />
-                                    </Button>
+
+                                {/* Notes + Actions Row */}
+                                <div className="flex flex-col sm:flex-row gap-3 items-end">
+                                    <div className="flex-1 w-full">
+                                        <Textarea
+                                            rows={2}
+                                            placeholder="Enter Maker Notes or findings here before escalation..."
+                                            value={notes}
+                                            onChange={(e) => setNotes(e.target.value)}
+                                            className="resize-none bg-white/90 dark:bg-zinc-950 border-amber-200/60 dark:border-zinc-800 focus-visible:ring-amber-400/40 dark:focus-visible:ring-zinc-700 w-full text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <Button variant="destructive" onClick={handleReject} disabled={isActionLoading.reject} className="whitespace-nowrap bg-red-600 hover:bg-red-700 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 font-bold border dark:border-red-900/50">
+                                            {isActionLoading.reject ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="mr-2 h-4 w-4" />} Reject
+                                        </Button>
+                                        <Button onClick={handleEscalate} disabled={isActionLoading.escalate} className="w-full sm:w-auto cursor-pointer bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-white font-bold whitespace-nowrap shadow-md backdrop-blur-sm">
+                                            {isActionLoading.escalate ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : 'Escalate to L2'}
+                                            {!isActionLoading.escalate && <ChevronRight className="ml-2 h-4 w-4" />}
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
