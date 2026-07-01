@@ -1,4 +1,8 @@
-// Ensure AWS_ENDPOINT_URL points to localhost if running outside docker
+// Only run LocalStack tests if explicitly running with LocalStack (not in production)
+if (process.env.CLOUDINARY_URL || !process.env.AWS_ENDPOINT_URL) {
+    console.log('ℹ️ Cloudinary configured or no LocalStack endpoint — skipping LocalStack test.');
+    return;
+}
 if (!process.env.AWS_ENDPOINT_URL) {
     process.env.AWS_ENDPOINT_URL = "http://127.0.0.1:4566";
 }

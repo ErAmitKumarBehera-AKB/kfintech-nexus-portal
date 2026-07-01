@@ -36,7 +36,7 @@ exports.getL2Queue = async (req, res) => {
 
         const total = await Ticket.countDocuments(query);
 
-        res.status(200).json({
+        return res.status(200).json({
             tickets,
             pagination: {
                 total,
@@ -45,119 +45,112 @@ exports.getL2Queue = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("Error fetching L2 queue:", error);
-        res.status(500).json({ message: "Failed to fetch L2 queue" });
+        console.error('Error fetching L2 queue:', error);
+        return res.status(500).json({ message: 'Failed to fetch L2 queue' });
     }
 };
 
 exports.finalizeTicket = async (req, res) => {
     const { ticketId, action, notes } = req.body;
-    
-    // Fallback mock ID for L2 Admin Checker
-    const adminId = req.user ? req.user.id : new mongoose.Types.ObjectId('60d5ecb8b392d700153f3a02');
+    const adminId = req.user?.id;
 
     if (!ticketId || !action) {
-        return res.status(400).json({ message: "ticketId and action are required fields." });
+        return res.status(400).json({ message: 'ticketId and action are required fields.' });
     }
 
     if (!['APPROVE', 'REJECT', 'RETURN_TO_L1'].includes(action)) {
         return res.status(400).json({ message: "Invalid action. Must be 'APPROVE', 'REJECT', or 'RETURN_TO_L1'." });
     }
 
-    // 1. Strict MongoDB ACID Multi-Document Transaction
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    let ticket;
+    let previousStatus;
+    let userProfileUpdated = false;
 
     try {
-        // 2. Safely find the ticket ensuring it's exactly in L2_APPROVAL state
-        const ticket = await Ticket.findOne({ _id: ticketId, status: 'L2_APPROVAL' }).populate('investorId').session(session);
+        // Step 1: Find the ticket (no session needed — Atlas free tier compatible)
+        ticket = await Ticket.findOne({ _id: ticketId, status: 'L2_APPROVAL' }).populate('investorId');
         if (!ticket) {
-            throw new Error("Target Ticket not found or is not currently pending L2_APPROVAL status.");
+            return res.status(404).json({ message: 'Ticket not found or not in L2_APPROVAL status.' });
         }
 
-        const previousStatus = ticket.status;
-        let newStatus;
-        let userProfileUpdated = false;
-        let updateDetails = {};
+        previousStatus = ticket.status;
 
+        // Step 2: Determine the new status
+        let newStatus;
+        if (action === 'APPROVE') newStatus = 'RESOLVED';
+        else if (action === 'REJECT') newStatus = 'REJECTED';
+        else newStatus = 'L1_REVIEW'; // RETURN_TO_L1
+
+        // Step 3: If APPROVE, apply the profile changes to the investor
         if (action === 'APPROVE') {
-            newStatus = 'RESOLVED';
             ticket.resolvedAt = new Date();
-            
-            // Phase 4: ACTUAL EXECUTION
-            const user = await User.findById(ticket.investorId._id).session(session);
-            if (user && ticket.serviceMetadata) {
-                switch(ticket.serviceType) {
+            const investor = await User.findById(ticket.investorId._id);
+
+            if (investor && ticket.serviceMetadata) {
+                switch (ticket.serviceType) {
                     case 'BANK_ACCOUNT_UPDATE':
-                    case 'BANK_UPDATE': // supporting both based on schema enum
-                        user.bankAccount = {
-                            ...user.bankAccount,
+                    case 'BANK_UPDATE':
+                        investor.bankAccount = {
+                            ...investor.bankAccount,
                             accountNumber: ticket.serviceMetadata.newAccountNumber || ticket.serviceMetadata.accountNumber,
                             ifsc: ticket.serviceMetadata.newIfsc || ticket.serviceMetadata.ifsc,
                             bankName: ticket.serviceMetadata.newBankName || ticket.serviceMetadata.bankName
                         };
                         userProfileUpdated = true;
-                        updateDetails = { bankAccount: user.bankAccount };
                         break;
                     case 'KYC_UPDATE':
-                        user.kyc = { ...user.kyc, status: 'APPROVED' };
+                        investor.kyc = { ...investor.kyc, status: 'APPROVED' };
                         userProfileUpdated = true;
-                        updateDetails = { kycStatus: 'APPROVED' };
                         break;
                     case 'NOMINEE_UPDATE':
-                        user.nominee = {
-                            ...user.nominee,
+                        investor.nominee = {
+                            ...investor.nominee,
                             name: ticket.serviceMetadata.nomineeName,
                             relation: ticket.serviceMetadata.nomineeRelation
                         };
                         userProfileUpdated = true;
-                        updateDetails = { nominee: user.nominee };
                         break;
                     case 'ADDRESS_UPDATE':
-                        user.address = {
-                            ...user.address,
+                        investor.address = {
+                            ...investor.address,
                             street: ticket.serviceMetadata.newAddress || ticket.serviceMetadata.street,
                             city: ticket.serviceMetadata.city,
                             state: ticket.serviceMetadata.state,
                             zip: ticket.serviceMetadata.zipCode || ticket.serviceMetadata.zip
                         };
                         userProfileUpdated = true;
-                        updateDetails = { address: user.address };
                         break;
                 }
+
                 if (userProfileUpdated) {
-                    await user.save({ session });
-                    
-                    // Log profile update in AuditLog
-                    const profileAudit = new AuditLog({
-                        entityId: user._id,
+                    await investor.save();
+
+                    // Log the profile update
+                    await AuditLog.create({
+                        entityId: investor._id,
                         entityType: 'User',
                         action: 'USER_PROFILE_UPDATED',
                         performedBy: adminId,
                         details: {
                             ticketId: ticket._id,
-                            serviceType: ticket.serviceType,
-                            updatedFields: updateDetails
+                            serviceType: ticket.serviceType
                         }
                     });
-                    await profileAudit.save({ session });
                 }
             }
         }
-        else if (action === 'REJECT')    newStatus = 'REJECTED';
-        else                             newStatus = 'L1_REVIEW'; // RETURN_TO_L1
 
-        // 3. Update Status — and persist L2 return note if applicable
+        // Step 4: Update ticket status
         ticket.status = newStatus;
         if (action === 'RETURN_TO_L1' && notes) {
             ticket.l2ReturnNote = notes;
         } else if (action !== 'RETURN_TO_L1') {
-            ticket.l2ReturnNote = null; // clear on final resolution
+            ticket.l2ReturnNote = null;
         }
-        await ticket.save({ session });
+        await ticket.save();
 
-        // 4. Securely write final state to AuditLog
-        const auditLog = new AuditLog({
+        // Step 5: Write audit log
+        await AuditLog.create({
             entityId: ticket._id,
             entityType: 'Ticket',
             action: action === 'APPROVE' ? 'L2_TICKET_APPROVED'
@@ -171,49 +164,34 @@ exports.finalizeTicket = async (req, res) => {
             }
         });
 
-        await auditLog.save({ session });
-
-        // 5. Commit Transaction
-        await session.commitTransaction();
-        session.endSession();
-
-        // 6. Send Notifications
+        // Step 6: Send notifications (non-blocking — don't fail the response)
         try {
             const investor = ticket.investorId;
-            const msgStatus = action === 'APPROVE' ? 'APPROVED and RESOLVED'
-                            : action === 'REJECT'  ? 'REJECTED'
-                            :                        'returned to L1 for rework';
-            
             const notificationType = action === 'APPROVE' ? 'TICKET_RESOLVED'
                                    : action === 'REJECT' ? 'TICKET_REJECTED'
                                    : 'RETURNED_TO_L1';
-            
+
             await notificationService.createNotification({
-                userId: investor ? investor._id : ticket.investorId,
+                userId: investor?._id || ticket.investorId,
                 ticketId: ticket._id,
                 type: notificationType,
-                title: `Ticket ${action === 'APPROVE' ? 'Resolved' : action === 'REJECT' ? 'Rejected' : 'Update'}`,
-                message: `Your ticket has been ${msgStatus} by our L2 team.`,
+                title: action === 'APPROVE' ? 'Ticket Resolved' : action === 'REJECT' ? 'Ticket Rejected' : 'Ticket Update',
+                message: `Your ticket has been ${action === 'APPROVE' ? 'approved and resolved' : action === 'REJECT' ? 'rejected' : 'returned to L1 for rework'} by our review team.`,
                 channels: { inApp: true, email: true }
             });
-        } catch (notificationError) {
-            console.error("Non-critical error sending notification:", notificationError);
+        } catch (notifErr) {
+            console.error('[L2] Non-critical notification error:', notifErr.message);
         }
 
         return res.status(200).json({
-            message: `Ticket successfully finalized. Automated workflow advanced ticket from ${previousStatus} to ${newStatus}.`,
+            message: `Ticket successfully ${action.toLowerCase()}d. Status: ${previousStatus} → ${newStatus}.`,
             ticket
         });
 
     } catch (error) {
-        // 6. Transaction Rollback
-        await session.abortTransaction();
-        session.endSession();
-        console.error("L2 Checker Transaction safely aborted:", error);
-        
-        const statusCode = error.message.includes("not found") ? 404 : 500;
-        return res.status(statusCode).json({
-            message: "Failed to finalize ticket. MongoDB Transaction aborted.",
+        console.error('[L2] finalizeTicket error:', error);
+        return res.status(500).json({
+            message: 'Failed to finalize ticket.',
             error: error.message
         });
     }
