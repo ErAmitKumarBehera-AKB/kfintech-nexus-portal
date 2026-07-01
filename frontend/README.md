@@ -1,43 +1,86 @@
-# 🎨 KFintech Nexus Portal — Enterprise Frontend UI
+# FinnovaX Frontend
 
-Welcome to the frontend repository for the **KFintech Nexus Portal**. This interface is engineered for high-volume enterprise data entry and grievance management, providing a frictionless user experience for both external investors and internal compliance officers.
+> React + Vite + Tailwind CSS — Investor Portal, Admin Desks & AI Chatbot
 
-## 🌟 Business Impact & UX Strategy
-In the financial services sector, clunky internal tools lead to fatigue, errors, and increased Turnaround Times (TAT). We built this frontend to solve that:
-- **Glassmorphic Design System:** Provides a modern, calm, and distraction-free environment that reduces cognitive load for agents processing hundreds of tickets a day.
-- **Role-Based Workspaces:** Context-switching is eliminated. Investors see a clean submission portal; L1 Makers see triage dashboards enriched with AI summaries; L2 Checkers see strict approval interfaces.
-- **Real-Time Data Feeds:** Immediate feedback loops on file uploads, OCR verification, and Sentiment Analysis scores.
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat&logo=react)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-Latest-646CFF?style=flat&logo=vite)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-06B6D4?style=flat&logo=tailwindcss)](https://tailwindcss.com/)
 
-## 🛠️ Technology Stack
-- **Framework:** React.js powered by Vite for lightning-fast HMR (Hot Module Replacement) and optimized production builds.
-- **Styling:** TailwindCSS for utility-first, highly responsive design scaling from mobile devices to ultrawide enterprise monitors.
-- **State Management:** React Hooks and Context API for lightweight, prop-drilling-free data flow.
-- **Routing:** React Router DOM for seamless Single Page Application (SPA) navigation.
+---
 
-## 🚀 Development Setup
-*(Note: If you are running the full stack via Docker Compose from the root directory, you do not need to run these commands manually).*
+## What This Is
 
-To run the frontend in standalone development mode:
+The frontend is a Single Page Application (SPA) that serves four distinct role-based interfaces over a unified codebase:
 
-1. **Install Dependencies:**
-   ```bash
-   npm install
-   ```
+| Portal | Route | Users |
+|--------|-------|-------|
+| Landing Page | `/` | All visitors |
+| Auth Pages | `/login`, `/register`, `/forgot-password` | Unauthenticated |
+| Investor Dashboard | `/investor` | `INVESTOR` role |
+| L1 Maker Desk | `/l1-maker` | `ADMIN_L1` role |
+| L2 Checker Desk | `/l2-checker` | `ADMIN_L2` role |
+| Super Admin Dashboard | `/admin` | `ADMIN_SUPER` role |
+| Profile Page | `/profile` | All authenticated |
 
-2. **Start the Development Server:**
-   ```bash
-   npm run dev
-   ```
-   The application will be available at `http://localhost:5173`.
+Navigation between portals is guarded by `ProtectedRoute.jsx`, which checks the user's role from `AuthContext` and redirects unauthorized access.
 
-3. **Build for Production:**
-   ```bash
-   npm run build
-   ```
-   This generates an optimized, minified bundle in the `dist` directory, ready to be served by NGINX in our Docker container.
+---
 
-## 🛡️ Hackathon Focus: Maker-Checker Enforcement
-A critical aspect of our UI is the enforcement of the **Maker-Checker** principle:
-- **Investor Dashboard:** Cannot view internal AI metrics or approve their own tickets.
-- **L1 Maker Desk:** Can view AI summaries and escalate, but the "Finalize" button is structurally disabled or hidden.
-- **L2 Checker Desk:** The only interface capable of triggering the final `POST /api/l2/finalize` endpoint, ensuring 100% audit compliance.
+## Real-World Purpose
+
+This is not a mock UI. Every button triggers a real API call:
+
+- **Investor submitting a ticket** → `POST /api/tickets` → FinBERT analyzes the text → Cloudinary stores documents → email is sent
+- **L1 clicking "Get AI Summary"** → `POST /api/l1/tickets/:id/summarize` → Gemini/Ollama generates 3 bullets
+- **L2 clicking "Approve"** → `POST /api/l2/finalize` → ticket resolved → investor gets a branded HTML email
+- **Chat input** → `POST /api/chat/ask` → ChromaDB + Gemini RAG response rendered in WhatsApp-style bubble
+
+---
+
+## Setup
+
+```bash
+npm install
+
+# For development:
+npm run dev
+
+# For production build:
+npm run build
+```
+
+**Environment variables (`.env.local`):**
+```
+VITE_API_URL=http://localhost:5000/api
+```
+
+---
+
+## Key Files
+
+| File | Purpose | Test By |
+|------|---------|---------|
+| `src/App.jsx` | Root routing, RBAC route guards, global layout | Check that `/admin` redirects an investor to `/investor` |
+| `src/context/AuthContext.jsx` | JWT user state, role-aware routing | Log in as different roles |
+| `src/context/ThemeContext.jsx` | Dark/Light mode, persisted in localStorage | Toggle theme, refresh page — state should persist |
+| `src/components/common/ChatbotWidget.jsx` | Finnora AI chatbot with interactive eyes, sound FX, WhatsApp bubbles | Focus a password field — Finnora closes her eyes |
+| `src/config/serviceTypes.js` | Source of truth for service types, SLA, required documents | Create a BANK_UPDATE ticket and see the checklist |
+| `src/pages/L1MakerDesk.jsx` | Full L1 triage dashboard — queue, sentiment, OCR, summary | Log in as L1, assign and summarize a ticket |
+| `src/pages/L2CheckerDesk.jsx` | L2 approval dashboard | Log in as L2, finalize an escalated ticket |
+
+---
+
+## Architecture
+
+```
+src/
+  api/client.js         ← Axios instance, auto-attaches JWT
+  context/              ← AuthContext (user state), ThemeContext (dark/light)
+  components/
+    common/             ← ChatbotWidget, Sidebar, ThemeToggle, Navbar
+    investor/           ← CreateTicketFlow, MyTickets, TicketDetail, Profile
+    admin/              ← StatCard, DashboardHeader, DashboardToolbar
+    ui/                 ← shadcn/ui + custom animations
+  pages/                ← One file per route
+  config/               ← serviceTypes.js
+```
