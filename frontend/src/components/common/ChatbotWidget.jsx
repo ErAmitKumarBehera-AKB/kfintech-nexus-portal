@@ -431,26 +431,26 @@ const ChatbotWidget = () => {
                 className="group flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-[0_8px_30px_rgba(0,0,0,0.2)] ring-1 ring-black/5 transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white relative overflow-hidden"
                 aria-label="Toggle chatbot"
             >
-                <AnimatePresence mode="wait">
+                <AnimatePresence>
                     {isOpen ? (
                         <motion.span
                             key="close"
-                            initial={{ opacity: 0, rotate: -45, scale: 0.5 }}
-                            animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                            exit={{ opacity: 0, rotate: 45, scale: 0.5 }}
-                            transition={{ duration: 0.18 }}
-                            className="flex items-center justify-center"
+                            initial={{ opacity: 0, scale: 0.5 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.5 }}
+                            transition={{ duration: 0.12 }}
+                            className="absolute flex items-center justify-center"
                         >
                             <X className="h-6 w-6" />
                         </motion.span>
                     ) : (
                         <motion.span
                             key="eyes"
-                            initial={{ opacity: 0, rotate: 45, scale: 0.5 }}
-                            animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                            exit={{ opacity: 0, rotate: -45, scale: 0.5 }}
-                            transition={{ duration: 0.18 }}
-                            className="flex items-center justify-center"
+                            initial={{ opacity: 0, scale: 0.5 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.5 }}
+                            transition={{ duration: 0.12 }}
+                            className="absolute flex items-center justify-center"
                         >
                             <InteractiveEyeIcon size={28} isClosed={isPasswordFocus} className="group-hover:scale-110 transition-transform" />
                         </motion.span>

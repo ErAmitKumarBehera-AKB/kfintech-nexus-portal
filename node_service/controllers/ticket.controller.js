@@ -136,11 +136,12 @@ exports.createTicket = async (req, res) => {
 
 exports.previewSentiment = async (req, res) => {
     try {
-        const { title = '', description = '' } = req.body;
-        const text = `${title} ${description}`.trim();
+        // Accept { text } OR { title, description } from different callers
+        const { title = '', description = '', text: rawText } = req.body;
+        const text = rawText || `${title} ${description}`.trim();
 
         if (!text) {
-            return res.status(400).json({ message: 'title or description is required.' });
+            return res.status(400).json({ message: 'Provide text, or title and description.' });
         }
 
         const sentiment = await mlService.analyzeSentiment(text);
