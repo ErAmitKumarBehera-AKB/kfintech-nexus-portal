@@ -1,9 +1,16 @@
 const axios = require('axios');
 const ChatSession = require('../models/ChatSession');
 
+const getSessionId = (req) => {
+    return req.headers['x-session-id'] || (req.user ? req.user.id : null);
+};
+
 exports.getHistory = async (req, res) => {
     try {
-        const session = await ChatSession.findOne({ userId: req.user.id });
+        const sessionId = getSessionId(req);
+        if (!sessionId) return res.status(200).json({ messages: [] });
+
+        const session = await ChatSession.findOne({ sessionId });
         if (!session) {
             return res.status(200).json({ messages: [] });
         }
@@ -16,21 +23,28 @@ exports.getHistory = async (req, res) => {
 
 exports.askAssistant = async (req, res) => {
     const { question } = req.body;
+    const sessionId = getSessionId(req);
 
     if (!question) {
         return res.status(400).json({ message: "A question field is required to ask the AI Chatbot." });
     }
+    
+    if (!sessionId) {
+        return res.status(400).json({ message: "Session ID is required." });
+    }
 
     try {
-        // 1. (Removed Ticket Context - strict RAG FAQ only)
-
-        // 2. Fetch or create chat session
-        let session = await ChatSession.findOne({ userId: req.user.id });
+        // Fetch or create chat session
+        let session = await ChatSession.findOne({ sessionId });
         if (!session) {
-            session = new ChatSession({ userId: req.user.id, messages: [] });
+            session = new ChatSession({ 
+                sessionId,
+                userId: req.user ? req.user.id : undefined,
+                messages: [] 
+            });
         }
 
-        // 3. Save User Message
+        // Save User Message
         const userMsg = {
             type: 'user',
             text: question,
@@ -38,14 +52,13 @@ exports.askAssistant = async (req, res) => {
         };
         session.messages.push(userMsg);
         
-        // 4. Format history for ML Service
-        // We only send the last 6 messages to keep the prompt size reasonable
+        // Format history for ML Service
         const historyForMl = session.messages.slice(-6).map(m => ({
             type: m.type,
             text: m.text
         }));
 
-        // 5. Proxy the request to Python RAG Engine
+        // Proxy the request to Python RAG Engine
         const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
         const aiResponse = await axios.post(`${mlServiceUrl}/chatbot/ask`, {
             question: question,
@@ -54,7 +67,7 @@ exports.askAssistant = async (req, res) => {
 
         const mlData = aiResponse.data;
 
-        // 6. Save Bot Message
+        // Save Bot Message
         const botMsg = {
             type: 'bot',
             text: mlData.response || "No response.",
@@ -65,12 +78,11 @@ exports.askAssistant = async (req, res) => {
         session.messages.push(botMsg);
         await session.save();
 
-        // 7. Return payload
         return res.status(200).json({
             message: "AI Chatbot generated a response successfully.",
             data: {
                 ...mlData,
-                botMessage: botMsg // Include the formatted message for the UI
+                botMessage: botMsg 
             }
         });
     } catch (error) {
