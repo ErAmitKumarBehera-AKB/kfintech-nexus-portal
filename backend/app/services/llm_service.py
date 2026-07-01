@@ -3,6 +3,8 @@ import httpx
 from google import genai
 
 GENI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+OLLAMA_MODEL = os.getenv("CHAT_MODEL", "llama3.2:1b")
 client = None
 if GENI_API_KEY:
     client = genai.Client(api_key=GENI_API_KEY)
@@ -25,8 +27,8 @@ async def query_llm(full_prompt: str) -> str:
     llm_response = ""
     try:
         async with httpx.AsyncClient(timeout=10.0) as http_client:
-            response = await http_client.post("http://localhost:11434/api/generate", json={
-                "model": "llama3.2:1b",
+            response = await http_client.post(OLLAMA_URL, json={
+                "model": OLLAMA_MODEL,
                 "prompt": full_prompt,
                 "stream": False
             })

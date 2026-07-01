@@ -28,6 +28,17 @@ app.include_router(chatbot.router, prefix="/chatbot", tags=["RAG Chatbot"])
 app.include_router(summarizer.router, prefix="/summarize", tags=["Summarizer"])
 app.include_router(health.router, prefix="/health", tags=["Health"])
 
+@app.on_event("startup")
+async def startup_event():
+    """Auto-seed the ChromaDB knowledge base on every startup if empty."""
+    try:
+        from app.services.knowledge_base import seed_faqs
+        seed_faqs()
+        print("✅ ChromaDB FAQ knowledge base ready.")
+    except Exception as e:
+        print(f"⚠️ ChromaDB seeding failed (non-critical): {e}")
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the KFintech Nexus Portal AI Models API. Use /docs to view the API documentation."}
+
