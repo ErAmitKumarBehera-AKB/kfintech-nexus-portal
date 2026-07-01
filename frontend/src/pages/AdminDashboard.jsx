@@ -74,7 +74,7 @@ const AdminDashboard = () => {
 
         if (activeTab === 'tickets' || activeTab === 'flagged') {
             let list = activeTab === 'tickets' ? ticketsList : flaggedList;
-            
+
             // Apply local filters for flagged tab since the API returns all flagged
             if (activeTab === 'flagged') {
                 if (ticketStatus !== 'ALL') {
@@ -140,17 +140,17 @@ const AdminDashboard = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/50 pb-20 font-sans text-zinc-950 selection:bg-indigo-100 selection:text-indigo-900 relative">
+        <div className="min-h-screen bg-[#faf7f2] dark:bg-[#0f0f12] pb-20 font-sans text-zinc-950 dark:text-zinc-50 relative">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col">
-                <DashboardToolbar 
-                    activeTab={activeTab} 
-                    setDateRange={setDateRange} 
+                <DashboardToolbar
+                    activeTab={activeTab}
+                    setDateRange={setDateRange}
                     setTicketStatus={setTicketStatus}
                     setTicketPriority={setTicketPriority}
                     setUserRole={setUserRole}
-                    handleExportCsv={handleExportCsv} 
-                    fetchData={fetchData} 
-                    loading={loading} 
+                    handleExportCsv={handleExportCsv}
+                    fetchData={fetchData}
+                    loading={loading}
                 />
 
                 <div className="w-full px-4 sm:px-8 xl:px-12 py-8">
@@ -172,25 +172,25 @@ const AdminDashboard = () => {
                                 </div>
                                 <RecentTickets ticketsList={ticketsList} setActiveTab={setActiveTab} />
                             </TabsContent>
-                            
+
                             <TabsContent value="tickets" className="m-0 min-h-[500px]">
                                 <TicketTable data={ticketsList} activeTab="tickets" page={page} totalPages={totalPages} setPage={setPage} />
                             </TabsContent>
-                            
+
                             <TabsContent value="users" className="m-0 min-h-[500px]">
                                 <UserTable data={usersList} page={page} totalPages={totalPages} setPage={setPage} handleToggleUserStatus={handleToggleUserStatus} />
                             </TabsContent>
-                            
+
                             <TabsContent value="flagged" className="m-0 min-h-[500px]">
-                                <TicketTable 
-                                    data={flaggedList.filter(t => 
+                                <TicketTable
+                                    data={flaggedList.filter(t =>
                                         (ticketStatus === 'ALL' || t.status === ticketStatus) &&
                                         (ticketPriority === 'ALL' || t.assignedPriority === ticketPriority)
-                                    )} 
-                                    activeTab="flagged" 
-                                    page={page} 
-                                    totalPages={totalPages} 
-                                    setPage={setPage} 
+                                    )}
+                                    activeTab="flagged"
+                                    page={page}
+                                    totalPages={totalPages}
+                                    setPage={setPage}
                                 />
                             </TabsContent>
 
