@@ -26,9 +26,12 @@ const ChatMessageSchema = new mongoose.Schema({
 const ChatSessionSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'User'
+    },
+    sessionId: {
+        type: String,
         required: true,
-        unique: true // One continuous session per user for simplicity
+        unique: true
     },
     messages: [ChatMessageSchema]
 }, { timestamps: true });

@@ -114,6 +114,23 @@ exports.createTicket = async (req, res) => {
     }
 };
 
+exports.previewSentiment = async (req, res) => {
+    try {
+        const { title = '', description = '' } = req.body;
+        const text = `${title} ${description}`.trim();
+
+        if (!text) {
+            return res.status(400).json({ message: 'title or description is required.' });
+        }
+
+        const sentiment = await mlService.analyzeSentiment(text);
+        return res.status(200).json({ message: 'Sentiment analysed successfully.', sentiment });
+    } catch (error) {
+        console.error('[Ticket] previewSentiment error:', error);
+        return res.status(500).json({ message: 'Failed to analyse sentiment.', error: error.message });
+    }
+};
+
 exports.getTickets = async (req, res) => {
     try {
         const query = {};
