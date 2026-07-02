@@ -1,14 +1,26 @@
 import re
 import difflib
 
-try:
-    import easyocr
-    import torch
-    reader = easyocr.Reader(['en'], gpu=torch.cuda.is_available())
-except Exception as e:
-    reader, print_err = None, print(f"EasyOCR Init Failed: {e}")
+import threading
+
+_reader = None
+_reader_lock = threading.Lock()
+
+def get_reader():
+    global _reader
+    if _reader is None:
+        with _reader_lock:
+            if _reader is None:
+                try:
+                    import easyocr
+                    import torch
+                    _reader = easyocr.Reader(['en'], gpu=torch.cuda.is_available())
+                except Exception as e:
+                    print(f"EasyOCR Init Failed: {e}")
+    return _reader
 
 def extract_and_verify(images: list[bytes], account_number: str):
+    reader = get_reader()
     if not reader: return False, [], "OCR Engine Offline"
     if not images: return False, [], "No images provided"
 
@@ -53,6 +65,7 @@ def extract_and_verify(images: list[bytes], account_number: str):
     return acc_found, all_blocks, msg
 
 def extract_and_verify_kyc(images: list[bytes], target_name: str, target_dob: str):
+    reader = get_reader()
     if not reader: return False, [], "OCR Engine Offline"
     if not images: return False, [], "No images provided"
 

@@ -1,14 +1,23 @@
 import torch
 from transformers import pipeline
 
-# Load pipeline globally to avoid reloading on every request
-try:
-    device = 0 if torch.cuda.is_available() else -1
-    # Upgraded to Industry-Standard Financial Model
-    sentiment_analyzer = pipeline("sentiment-analysis", model="ProsusAI/finbert", device=device)
-except Exception as e:
-    sentiment_analyzer = None
-    print(f"Failed to load transformer model: {e}")
+import threading
+
+_analyzer = None
+_analyzer_lock = threading.Lock()
+
+def get_analyzer():
+    global _analyzer
+    if _analyzer is None:
+        with _analyzer_lock:
+            if _analyzer is None:
+                try:
+                    device = 0 if torch.cuda.is_available() else -1
+                    # Upgraded to Industry-Standard Financial Model
+                    _analyzer = pipeline("sentiment-analysis", model="ProsusAI/finbert", device=device)
+                except Exception as e:
+                    print(f"Failed to load transformer model: {e}")
+    return _analyzer
 
 def classify_intent(text: str) -> str:
     text_lower = text.lower()
@@ -27,9 +36,10 @@ def get_sentiment(text: str):
     fraud_alert = any(keyword in text.lower() for keyword in fraud_keywords)
     severe_keywords = ["lawyer", "sue", "legal", "unacceptable", "fbi", "police", "court", "urgent", "ombudsman", "disgusting", "terrible"]
     
-    if sentiment_analyzer:
+    analyzer = get_analyzer()
+    if analyzer:
         try:
-            result = sentiment_analyzer(text[:512])[0] # Truncate to avoid length errors
+            result = analyzer(text[:512])[0] # Truncate to avoid length errors
             label = result['label'].upper()
             confidence = result['score']
             
